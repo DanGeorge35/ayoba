@@ -116,24 +116,27 @@ const YouTubeAnalytics: React.FC = () => {
   };
 
   // Fetch your own revenue
-  const fetchRevenue = async (): Promise<void> => {
-    if (!isSignedIn) return alert("Please authenticate first");
-    try {
-      const response = await window.gapi.client.youtubeAnalytics.reports.query({
-        ids: "channel==MINE",
-        startDate: "2025-01-01",
-        endDate: "2025-12-31",
-        metrics: "estimatedRevenue,adRevenue,transactionRevenue",
-        dimensions: "month",
-        sort: "month",
-      });
-      setRevenue(response.result);
-      console.log("Revenue response:", response);
-    } catch (err) {
-      console.error("Revenue fetch error", err);
-      setError("Failed to fetch revenue");
-    }
-  };
+const fetchRevenue = async (): Promise<void> => {
+  if (!isSignedIn) return alert("Please authenticate first");
+  try {
+    const response = await window.gapi.client.youtubeAnalytics.reports.query({
+      ids: "channel==MINE",
+      startDate: "2025-01-01",
+      endDate: "2025-12-31",
+      metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue",
+      dimensions: "month",
+      sort: "month",
+      currency: "USD", // optional but recommended
+    });
+
+    setRevenue(response.result);
+    console.log("Revenue response:", response);
+  } catch (err) {
+    console.error("Revenue fetch error", err);
+    setError("Failed to fetch revenue");
+  }
+};
+
 
   // Fetch public channel stats
   const fetchPublicStats = async (id: string) => {
