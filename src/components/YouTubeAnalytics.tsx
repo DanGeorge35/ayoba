@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 
-const CLIENT_ID = "943556130775-fbsgln3igbohm502mhhomn0e8c2895gj.apps.googleusercontent.com";
+const CLIENT_ID = "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 const SCOPES = "https://www.googleapis.com/auth/yt-analytics.readonly";
 
 declare global {
