@@ -144,7 +144,7 @@ const loadAnalyticsClient = async () => {
     if (!accessToken) return alert("Authenticate first to get access token");
     try {
       window.gapi.client.setToken({ access_token: accessToken });
-      alert("Access token is set, fetching revenue...");
+      alert("Access token is set, fetching revenue..");
       alert(accessToken);
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
