@@ -24,8 +24,12 @@ ChartJS.register(
   Legend
 );
 
-const CLIENT_ID = "YOUR_CLIENT_ID";
-const API_KEY = "YOUR_API_KEY";
+const CLIENT_ID =
+  "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
+
+// API key for public stats
+const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
+
 const SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
   "https://www.googleapis.com/auth/youtube.readonly",
