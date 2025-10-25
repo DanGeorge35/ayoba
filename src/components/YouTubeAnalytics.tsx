@@ -1,20 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 
-// OAuth credentials
-// OAuth credentials
 const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
-
-// API key for public stats
 const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
-
-// Multiple OAuth scopes
-const SCOPES = [
-  "https://www.googleapis.com/auth/yt-analytics.readonly",
-  "https://www.googleapis.com/auth/youtube.readonly"
-].join(" ");
 
 declare global {
   interface Window {
@@ -33,96 +22,61 @@ interface ChannelStats {
 }
 
 const YouTubeAnalytics: React.FC = () => {
-  const [gapiLoaded, setGapiLoaded] = useState(false);
-  const [tokenClient, setTokenClient] = useState<any>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
   const [revenue, setRevenue] = useState<any>(null);
   const [channelId, setChannelId] = useState("");
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
- 
-  // Load GAPI and GIS scripts
+
+  // Load GAPI script
   useEffect(() => {
-    const gapiScript = document.createElement("script");
-    gapiScript.src = "https://apis.google.com/js/api.js";
-    gapiScript.async = true;
-    gapiScript.onload = () => {
-      window.gapi.load("client", async () => {
-        try {
-          await window.gapi.client.init({});
-          setGapiLoaded(true);
-          console.log("GAPI client loaded", gapiLoaded);
-
-        } catch (err) {
-          console.error("Error initializing GAPI client", err);
-        }
-      });
+    const script = document.createElement("script");
+    script.src = "https://apis.google.com/js/api.js";
+    script.async = true;
+    script.onload = async () => {
+      try {
+        await window.gapi.load("client");
+        console.log("GAPI loaded");
+      } catch (err) {
+        console.error("Error loading GAPI", err);
+      }
     };
-    document.body.appendChild(gapiScript);
-
-    const gisScript = document.createElement("script");
-    gisScript.src = "https://accounts.google.com/gsi/client";
-    gisScript.async = true;
-    document.body.appendChild(gisScript);
-
+    document.body.appendChild(script);
     return () => {
-      document.body.removeChild(gapiScript);
-      document.body.removeChild(gisScript);
+      document.body.removeChild(script);
     };
   }, []);
 
-  // Initialize Token Client
-  useEffect(() => {
-    if (!window.google) return;
-    const client = window.google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: (tokenResponse: any) => {
-        if (tokenResponse.access_token) {
-          setAccessToken(tokenResponse.access_token);
-          console.log("Access token acquired:", tokenResponse.access_token);
-        }
-      },
-    });
-    setTokenClient(client);
-  }, [window.google]);
-
-  // OAuth login
-const authenticate = async (): Promise<void> => {
-  if (!tokenClient) return alert("Token client not ready");
-  tokenClient.requestAccessToken();
-  
-  // Wait a bit for access token to be set
-  const interval = setInterval(() => {
-    if (accessToken) {
-      clearInterval(interval);
-      loadAnalyticsClient();
-    }
-  }, 100);
-};
-
-const loadAnalyticsClient = async () => {
-  try {
-    await window.gapi.client.load(
-      "youtubeAnalytics", 
-      "v2"
-    );
-    console.log("YouTube Analytics API loaded");
-  } catch (err) {
-    console.error("Failed to load YouTube Analytics API", err);
-  }
-};
-
-
-  // Fetch your own analytics
-  const fetchMyAnalytics = async (): Promise<void> => {
-    if (!accessToken) return alert("Authenticate first to get access token");
+  // GIS OAuth login
+  const authenticate = async (): Promise<void> => {
     try {
-      window.gapi.client.setToken({ access_token: accessToken });
-      alert("Access token is set, fetching analytics...");
-      alert(accessToken);
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: "https://www.googleapis.com/auth/yt-analytics.readonly https://www.googleapis.com/auth/youtube.readonly",
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.access_token) {
+            window.gapi.client.setToken({ access_token: tokenResponse.access_token });
+            setIsSignedIn(true);
+            console.log("Access token acquired:", tokenResponse.access_token);
+
+            // Load YouTube Analytics API after token
+            await window.gapi.client.load("youtubeAnalytics", "v2");
+            console.log("YouTube Analytics API loaded");
+          }
+        },
+      });
+      tokenClient.requestAccessToken();
+    } catch (err) {
+      console.error("Error authenticating", err);
+    }
+  };
+
+  // Fetch channel analytics
+  const fetchMyAnalytics = async () => {
+    if (!isSignedIn) return alert("Please authenticate first");
+    try {
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate: "2025-01-01",
@@ -133,19 +87,16 @@ const loadAnalyticsClient = async () => {
         sort: "day",
       });
       setAnalytics(response.result);
-      console.log("Analytics response:", response);
+      console.log("Analytics response:", response.result);
     } catch (err) {
       console.error("Analytics fetch error", err);
     }
   };
 
-  // Fetch your revenue
-  const fetchRevenue = async (): Promise<void> => {
-    if (!accessToken) return alert("Authenticate first to get access token");
+  // Fetch revenue
+  const fetchRevenue = async () => {
+    if (!isSignedIn) return alert("Please authenticate first");
     try {
-      window.gapi.client.setToken({ access_token: accessToken });
-      alert("Access token is set, fetching revenue..");
-      alert(accessToken);
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate: "2025-01-01",
@@ -155,7 +106,7 @@ const loadAnalyticsClient = async () => {
         sort: "month",
       });
       setRevenue(response.result);
-      console.log("Revenue response:", response);
+      console.log("Revenue response:", response.result);
     } catch (err) {
       console.error("Revenue fetch error", err);
     }
@@ -209,14 +160,14 @@ const loadAnalyticsClient = async () => {
         </button>
         <button
           onClick={fetchMyAnalytics}
-          disabled={!accessToken}
+          disabled={!isSignedIn}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Fetch My Analytics
         </button>
         <button
           onClick={fetchRevenue}
-          disabled={!accessToken}
+          disabled={!isSignedIn}
           className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
         >
           Fetch My Revenue
@@ -263,12 +214,18 @@ const loadAnalyticsClient = async () => {
 
       {stats && (
         <div className="border p-4 rounded shadow bg-white mb-6">
-          <img src={stats.thumbnail} alt={stats.title} className="mb-2 rounded" />
+          <img
+            src={stats.thumbnail}
+            alt={stats.title}
+            className="mb-2 rounded"
+          />
           <h3 className="font-bold text-2xl">{stats.title}</h3>
           <p className="mb-1">Subscribers: {stats.subscribers}</p>
           <p className="mb-1">Views: {stats.views}</p>
           <p className="mb-1">Videos: {stats.videos}</p>
-          {stats.description && <p className="mt-2 text-gray-700">{stats.description}</p>}
+          {stats.description && (
+            <p className="mt-2 text-gray-700">{stats.description}</p>
+          )}
         </div>
       )}
     </div>
