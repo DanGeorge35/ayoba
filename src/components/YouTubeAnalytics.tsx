@@ -13,7 +13,6 @@ import {
 } from "chart.js";
 import { Line, Bar } from "react-chartjs-2";
 
-// Register chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -25,15 +24,13 @@ ChartJS.register(
   Legend
 );
 
-const CLIENT_ID =
-  "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
-const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
-
+const CLIENT_ID = "YOUR_CLIENT_ID";
+const API_KEY = "YOUR_API_KEY";
 const SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
-  "https://www.googleapis.com/auth/youtube.readonly", 
-    "https://www.googleapis.com/auth/youtubepartner",
-    "https://www.googleapis.com/auth/yt-analytics-monetary.readonly"
+  "https://www.googleapis.com/auth/youtube.readonly",
+  "https://www.googleapis.com/auth/youtubepartner",
+  "https://www.googleapis.com/auth/yt-analytics-monetary.readonly",
 ].join(" ");
 
 declare global {
@@ -67,7 +64,6 @@ const YouTubeAnalytics: React.FC = () => {
   const [endDate, setEndDate] = useState<string>("");
 
   useEffect(() => {
-    // Load GAPI
     const gapiScript = document.createElement("script");
     gapiScript.src = "https://apis.google.com/js/api.js";
     gapiScript.async = true;
@@ -76,7 +72,6 @@ const YouTubeAnalytics: React.FC = () => {
     };
     document.body.appendChild(gapiScript);
 
-    // Load GIS
     const gisScript = document.createElement("script");
     gisScript.src = "https://accounts.google.com/gsi/client";
     gisScript.async = true;
@@ -89,14 +84,14 @@ const YouTubeAnalytics: React.FC = () => {
     };
   }, []);
 
-  // Keep login state
   useEffect(() => {
-    const storedToken = sessionStorage.getItem("yt_token");
-    const storedName = sessionStorage.getItem("yt_name");
-    if (storedToken && storedName) {
-      window.gapi?.client.setToken({ access_token: storedToken });
+    // Load stored login
+    const token = localStorage.getItem("yt_token");
+    const name = localStorage.getItem("yt_name");
+    if (token && name) {
+      window.gapi?.client.setToken({ access_token: token });
       setIsSignedIn(true);
-      setUserName(storedName);
+      setUserName(name);
     }
 
     // Default last 2 months
@@ -107,7 +102,7 @@ const YouTubeAnalytics: React.FC = () => {
     setEndDate(today.toISOString().slice(0, 10));
   }, [gapiLoaded]);
 
-  const authenticate = async (): Promise<void> => {
+  const authenticate = async () => {
     if (!gisLoaded || !gapiLoaded) return alert("Google scripts not loaded yet");
 
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
@@ -117,18 +112,17 @@ const YouTubeAnalytics: React.FC = () => {
         if (tokenResponse.access_token) {
           window.gapi.client.setToken({ access_token: tokenResponse.access_token });
           setIsSignedIn(true);
-          sessionStorage.setItem("yt_token", tokenResponse.access_token);
+          localStorage.setItem("yt_token", tokenResponse.access_token);
 
           await window.gapi.client.load("youtubeAnalytics", "v2");
 
-          // Get user name
           const userRes = await window.gapi.client.youtube.channels.list({
             part: "snippet",
             mine: true,
           });
           const name = userRes.result.items[0].snippet.title;
           setUserName(name);
-          sessionStorage.setItem("yt_name", name);
+          localStorage.setItem("yt_name", name);
         }
       },
     });
@@ -137,27 +131,24 @@ const YouTubeAnalytics: React.FC = () => {
   };
 
   const logout = () => {
+    localStorage.removeItem("yt_token");
+    localStorage.removeItem("yt_name");
     window.gapi.client.setToken({ access_token: "" });
-    sessionStorage.removeItem("yt_token");
-    sessionStorage.removeItem("yt_name");
     setIsSignedIn(false);
     setUserName("");
     setAnalytics(null);
     setRevenue(null);
   };
 
-  const loadAnalyticsAPI = async () => {
-    if (!window.gapi.client.youtubeAnalytics) {
-      await window.gapi.client.load("youtubeAnalytics", "v2");
-    }
-  };
-
-  const fetchMyAnalytics = async (): Promise<void> => {
-    if (!isSignedIn) return alert("Please login first");
+  const fetchMyAnalytics = async () => {
+    if (!isSignedIn) return;
     setLoading(true);
+    setError("");
     try {
-      await loadAnalyticsAPI();
-      const response = await window.gapi.client.youtubeAnalytics.reports.query({
+      if (!window.gapi.client.youtubeAnalytics)
+        await window.gapi.client.load("youtubeAnalytics", "v2");
+
+      const res = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate,
         endDate,
@@ -166,7 +157,7 @@ const YouTubeAnalytics: React.FC = () => {
         dimensions: "day",
         sort: "day",
       });
-      setAnalytics(response.result);
+      setAnalytics(res.result);
     } catch (err) {
       console.error("Analytics fetch error", err);
       setError("Failed to fetch analytics");
@@ -175,12 +166,15 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
-  const fetchRevenue = async (): Promise<void> => {
-    if (!isSignedIn) return alert("Please login first");
+  const fetchRevenue = async () => {
+    if (!isSignedIn) return;
     setLoading(true);
+    setError("");
     try {
-      await loadAnalyticsAPI();
-      const response = await window.gapi.client.youtubeAnalytics.reports.query({
+      if (!window.gapi.client.youtubeAnalytics)
+        await window.gapi.client.load("youtubeAnalytics", "v2");
+
+      const res = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate,
         endDate,
@@ -189,7 +183,7 @@ const YouTubeAnalytics: React.FC = () => {
         sort: "month",
         currency: "USD",
       });
-      setRevenue(response.result);
+      setRevenue(res.result);
     } catch (err) {
       console.error("Revenue fetch error", err);
       setError("Failed to fetch revenue");
@@ -203,7 +197,7 @@ const YouTubeAnalytics: React.FC = () => {
     setError("");
     try {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${id}&key=${API_KEY}`
+        `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${id}&key=${API_KEY}`
       );
       const data = await res.json();
       if (data.items && data.items.length > 0) {
@@ -230,7 +224,7 @@ const YouTubeAnalytics: React.FC = () => {
     if (channelId.trim()) fetchPublicStats(channelId.trim());
   };
 
-  // Prepare chart data
+  // Chart data
   const revenueChartData = revenue?.rows
     ? {
         labels: revenue.rows.map((row: any) => row[0]),
@@ -269,7 +263,7 @@ const YouTubeAnalytics: React.FC = () => {
   return (
     <div className="p-4 max-w-5xl mx-auto">
       <h2 className="text-3xl font-bold mb-6 text-center">
-        Ayoba YouTube Analytics Dashboard
+        YouTube Analytics Dashboard
       </h2>
 
       <div className="mb-6 flex flex-wrap gap-3 justify-center items-center">
