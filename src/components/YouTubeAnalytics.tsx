@@ -1,15 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
 
 // OAuth credentials
 const CLIENT_ID =
@@ -40,21 +30,26 @@ const YouTubeAnalytics: React.FC = () => {
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [revenue, setRevenue] = useState<any>(null);
   const [channelId, setChannelId] = useState("");
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fromDate, setFromDate] = useState(
+    new Date(new Date().setMonth(new Date().getMonth() - 2))
+      .toISOString()
+      .slice(0, 10)
+  );
+  const [toDate, setToDate] = useState(new Date().toISOString().slice(0, 10));
 
-  // Load GAPI & GIS scripts
+  // Load GAPI and GIS scripts
   useEffect(() => {
     const gapiScript = document.createElement("script");
     gapiScript.src = "https://apis.google.com/js/api.js";
     gapiScript.async = true;
-    gapiScript.onload = () => {
-      window.gapi.load("client", async () => setGapiLoaded(true));
-    };
+    gapiScript.onload = () => window.gapi.load("client", async () => setGapiLoaded(true));
     document.body.appendChild(gapiScript);
 
     const gisScript = document.createElement("script");
@@ -63,15 +58,28 @@ const YouTubeAnalytics: React.FC = () => {
     gisScript.onload = () => setGisLoaded(true);
     document.body.appendChild(gisScript);
 
+    // Restore login state
+    const storedToken = localStorage.getItem("yt_access_token");
+    const storedName = localStorage.getItem("yt_user_name");
+    if (storedToken && storedName) {
+      window.gapi?.client.setToken({ access_token: storedToken });
+      setIsSignedIn(true);
+      setUserName(storedName);
+      if (gapiLoaded) {
+        fetchMyAnalytics();
+        fetchRevenue();
+      }
+    }
+
     return () => {
       document.body.removeChild(gapiScript);
       document.body.removeChild(gisScript);
     };
-  }, []);
+  }, [gapiLoaded]);
 
   // OAuth login
   const authenticate = async (): Promise<void> => {
-    if (!gisLoaded || !gapiLoaded) return alert("Scripts not loaded yet");
+    if (!gisLoaded || !gapiLoaded) return alert("Google scripts not loaded yet");
 
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
@@ -81,10 +89,18 @@ const YouTubeAnalytics: React.FC = () => {
           window.gapi.client.setToken({ access_token: tokenResponse.access_token });
           setIsSignedIn(true);
 
-          await window.gapi.client.load("youtubeAnalytics", "v2");
-          console.log("YouTube Analytics API loaded");
+          const meRes = await window.gapi.client.youtube.channels.list({
+            part: "snippet",
+            mine: true,
+          });
+          const name = meRes.result.items[0].snippet.title;
+          setUserName(name);
 
-          // Auto-fetch analytics and revenue
+          localStorage.setItem("yt_access_token", tokenResponse.access_token);
+          localStorage.setItem("yt_user_name", name);
+
+          await window.gapi.client.load("youtubeAnalytics", "v2");
+
           fetchMyAnalytics();
           fetchRevenue();
         }
@@ -94,16 +110,26 @@ const YouTubeAnalytics: React.FC = () => {
     tokenClient.requestAccessToken();
   };
 
-  // Fetch analytics (day dimension)
+  const logout = () => {
+    window.gapi.client.setToken(null);
+    setIsSignedIn(false);
+    setUserName(null);
+    setAnalytics(null);
+    setRevenue(null);
+    localStorage.removeItem("yt_access_token");
+    localStorage.removeItem("yt_user_name");
+  };
+
   const fetchMyAnalytics = async (): Promise<void> => {
-    if (!isSignedIn) return;
+    if (!isSignedIn) return alert("Please authenticate first");
+    setLoading(true);
+    setError("");
     try {
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
-        startDate: "2025-01-01",
-        endDate: "2025-12-31",
-        metrics:
-          "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
+        startDate: fromDate,
+        endDate: toDate,
+        metrics: "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
         dimensions: "day",
         sort: "day",
       });
@@ -111,25 +137,20 @@ const YouTubeAnalytics: React.FC = () => {
     } catch (err) {
       console.error("Analytics fetch error", err);
       setError("Failed to fetch analytics");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Fetch revenue (month dimension)
   const fetchRevenue = async (): Promise<void> => {
-    if (!isSignedIn) return;
-
-    const today = new Date();
-    const endDate = new Date(today.getFullYear(), today.getMonth(), 1); // first day of current month
-    const startDate = new Date(endDate.getFullYear(), 0, 1); // Jan 1st of current year
-
-    const formatDate = (d: Date) =>
-      `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, "0")}-01`;
-
+    if (!isSignedIn) return alert("Please authenticate first");
+    setLoading(true);
+    setError("");
     try {
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
-        startDate: formatDate(startDate),
-        endDate: formatDate(endDate),
+        startDate: fromDate,
+        endDate: toDate,
         metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue",
         dimensions: "month",
         sort: "month",
@@ -139,19 +160,20 @@ const YouTubeAnalytics: React.FC = () => {
     } catch (err) {
       console.error("Revenue fetch error", err);
       setError("Failed to fetch revenue");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Fetch public channel stats
   const fetchPublicStats = async (id: string) => {
     setLoading(true);
     setError("");
     try {
       const res = await fetch(
-        `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${id}&key=${API_KEY}`
+        `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&id=${id}&key=${API_KEY}`
       );
       const data = await res.json();
-      if (data.items?.length) {
+      if (data.items && data.items.length > 0) {
         const ch = data.items[0];
         setStats({
           title: ch.snippet.title,
@@ -161,7 +183,9 @@ const YouTubeAnalytics: React.FC = () => {
           videos: ch.statistics.videoCount,
           description: ch.snippet.description,
         });
-      } else setError("Channel not found");
+      } else {
+        setError("Channel not found");
+      }
     } catch (err) {
       console.error(err);
       setError("Failed to fetch channel stats");
@@ -177,66 +201,80 @@ const YouTubeAnalytics: React.FC = () => {
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      <h2 className="text-3xl font-bold mb-6">YouTube Analytics Dashboard</h2>
+      <h2 className="text-3xl font-bold mb-6 text-center">Ayoba YouTube Analytics Dashboard</h2>
 
-      <div className="mb-6 flex flex-wrap gap-3">
-        <button
-          onClick={authenticate}
-          disabled={!gisLoaded || !gapiLoaded}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
-          Authorize & Load
-        </button>
+      <div className="mb-6 flex flex-wrap gap-3 justify-center">
+        {!isSignedIn ? (
+          <button
+            onClick={authenticate}
+            disabled={!gisLoaded || !gapiLoaded}
+            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 w-full sm:w-auto"
+          >
+            Login to your account
+          </button>
+        ) : (
+          <button
+            onClick={logout}
+            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 w-full sm:w-auto"
+          >
+            Logout ({userName})
+          </button>
+        )}
       </div>
 
+      {isSignedIn && (
+        <div className="mb-6 flex flex-col sm:flex-row sm:flex-wrap gap-3 justify-center">
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border p-2 rounded w-full sm:w-auto"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border p-2 rounded w-full sm:w-auto"
+          />
+
+          <button
+            onClick={fetchMyAnalytics}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 w-full sm:w-auto"
+          >
+            Fetch Analytics
+          </button>
+          <button
+            onClick={fetchRevenue}
+            className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 w-full sm:w-auto"
+          >
+            Fetch Revenue
+          </button>
+        </div>
+      )}
+
+      {loading && <p className="text-blue-500 font-bold mb-4 text-center">Loading...</p>}
+      {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
+
       {analytics && (
-        <div className="mb-6 border p-4 rounded shadow bg-white">
+        <div className="mb-6 border p-4 rounded shadow bg-white overflow-auto">
           <h3 className="font-bold text-xl mb-2">My Channel Analytics</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analytics.rows?.map((r: any) => ({
-              day: r[0],
-              views: r[1],
-              minutesWatched: r[2],
-              avgViewDuration: r[3],
-              avgViewPercentage: r[4],
-              subscribersGained: r[5],
-            }))}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="day" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="views" stroke="#8884d8" />
-              <Line type="monotone" dataKey="minutesWatched" stroke="#82ca9d" />
-            </LineChart>
-          </ResponsiveContainer>
+          <p>Total Rows: {analytics.rows?.length || 0}</p>
+          <pre className="text-sm max-h-60 overflow-auto">
+            {JSON.stringify(analytics, null, 2)}
+          </pre>
         </div>
       )}
 
       {revenue && (
-        <div className="mb-6 border p-4 rounded shadow bg-white">
+        <div className="mb-6 border p-4 rounded shadow bg-white overflow-auto">
           <h3 className="font-bold text-xl mb-2">Revenue Overview</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={revenue.rows?.map((r: any) => ({
-              month: r[0],
-              estimatedRevenue: r[1],
-              estimatedAdRevenue: r[2],
-              estimatedRedPartnerRevenue: r[3],
-            }))}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="estimatedRevenue" stroke="#ffc658" />
-              <Line type="monotone" dataKey="estimatedAdRevenue" stroke="#ff8042" />
-              <Line type="monotone" dataKey="estimatedRedPartnerRevenue" stroke="#0088FE" />
-            </LineChart>
-          </ResponsiveContainer>
+          <pre className="text-sm max-h-60 overflow-auto">
+            {JSON.stringify(revenue, null, 2)}
+          </pre>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mb-4 flex gap-2 flex-wrap">
+      <form onSubmit={handleSubmit} className="mb-4 flex flex-col sm:flex-row gap-2">
         <input
           type="text"
           placeholder="Enter public channel ID"
@@ -246,23 +284,26 @@ const YouTubeAnalytics: React.FC = () => {
         />
         <button
           type="submit"
-          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 w-full sm:w-auto"
         >
           Fetch Public Stats
         </button>
       </form>
 
-      {loading && <p>Loading...</p>}
-      {error && <p className="text-red-500">{error}</p>}
-
       {stats && (
         <div className="border p-4 rounded shadow bg-white mb-6">
-          <img src={stats.thumbnail} alt={stats.title} className="mb-2 rounded" />
-          <h3 className="font-bold text-2xl">{stats.title}</h3>
-          <p className="mb-1">Subscribers: {stats.subscribers}</p>
-          <p className="mb-1">Views: {stats.views}</p>
-          <p className="mb-1">Videos: {stats.videos}</p>
-          {stats.description && <p className="mt-2 text-gray-700">{stats.description}</p>}
+          <img
+            src={stats.thumbnail}
+            alt={stats.title}
+            className="mb-2 rounded w-full max-w-xs mx-auto"
+          />
+          <h3 className="font-bold text-2xl text-center">{stats.title}</h3>
+          <p className="mb-1 text-center">Subscribers: {stats.subscribers}</p>
+          <p className="mb-1 text-center">Views: {stats.views}</p>
+          <p className="mb-1 text-center">Videos: {stats.videos}</p>
+          {stats.description && (
+            <p className="mt-2 text-gray-700 text-center">{stats.description}</p>
+          )}
         </div>
       )}
     </div>
