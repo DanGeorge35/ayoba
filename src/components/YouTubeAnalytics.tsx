@@ -53,7 +53,8 @@ const YouTubeAnalytics: React.FC = () => {
         try {
           await window.gapi.client.init({});
           setGapiLoaded(true);
-          console.log("GAPI client loaded");
+          console.log("GAPI client loaded", gapiLoaded);
+
         } catch (err) {
           console.error("Error initializing GAPI client", err);
         }
