@@ -1,13 +1,13 @@
-import './App.css'
+import React from "react";
+import YouTubeAnalytics from "./components/YouTubeAnalytics";
 
-function App() {
-
+const App: React.FC = () => {
   return (
-    <>
-      <h1 className="text-9xl text-amber-700 font-bold">Vite + React</h1>
+    <div>
+      <h1>Ayoba YouTube Analytics</h1>
+      <YouTubeAnalytics />
+    </div>
+  );
+};
 
-    </>
-  )
-}
-
-export default App
+export default App;
