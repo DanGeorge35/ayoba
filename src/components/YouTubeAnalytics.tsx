@@ -170,32 +170,57 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
-  const fetchRevenue = async () => {
-    if (!isSignedIn) return;
-    setLoading(true);
-    setError("");
-    try {
-      if (!window.gapi.client.youtubeAnalytics)
-        await window.gapi.client.load("youtubeAnalytics", "v2");
+const fetchRevenue = async () => {
+  if (!isSignedIn) return;
+  setLoading(true);
+  setError("");
+  setRevenue(null);
 
-      const res = await window.gapi.client.youtubeAnalytics.reports.query({
-        ids: "contentOwner==MINE",
-        startDate,
-        endDate,
-        metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue,grossRevenue",
-        // metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue,estimatedPlaybackBasedCpm,grossRevenue",
-        dimensions: "month",
-        sort: "month",
-        currency: "USD",
-      });
-      setRevenue(res.result);
-    } catch (err) {
-      console.error("Revenue fetch error", err);
-      setError("Failed to fetch revenue");
-    } finally {
-      setLoading(false);
+  try {
+    if (!window.gapi.client.youtubeAnalytics) {
+      await window.gapi.client.load("youtubeAnalytics", "v2");
     }
-  };
+
+    // Try channel-level revenue first (works for normal monetized channels)
+    const res = await window.gapi.client.youtubeAnalytics.reports.query({
+      ids: "channel==MINE", // channel-level report
+    //   ids: "contentOwner==MINE", // content owner-level report
+      startDate,
+      endDate,
+      metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue,grossRevenue",
+      dimensions: "month",
+      sort: "month",
+      currency: "USD",
+    });
+
+    // Check if data exists
+    if (!res.result || !res.result.rows || res.result.rows.length === 0) {
+      setError(
+        "Revenue data is unavailable. Only monetized channels or YouTube Content Owners have access."
+      );
+      return;
+    }
+
+    setRevenue(res.result);
+  } catch (err: any) {
+    console.error("Revenue fetch error", err);
+
+    if (err.status === 404) {
+      setError(
+        "Revenue data not found. Only YouTube Content Owners (MCNs) can access content owner reports."
+      );
+    } else if (err.result?.error?.errors?.some((e: any) => e.reason === "invalid")) {
+      setError(
+        "Revenue fetch failed: invalid metrics requested or access not allowed."
+      );
+    } else {
+      setError("Failed to fetch revenue data.");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const fetchPublicStats = async (id: string) => {
     setLoading(true);
