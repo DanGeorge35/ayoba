@@ -53,6 +53,12 @@ interface ChannelStats {
   description?: string;
 }
 
+interface Channel {
+  id: string;
+  title: string;
+  thumbnail: string;
+}
+
 const YouTubeAnalytics: React.FC = () => {
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
@@ -64,6 +70,7 @@ const YouTubeAnalytics: React.FC = () => {
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [channels, setChannels] = useState<Channel[]>([]);
   const [analyticsStartDate, setAnalyticsStartDate] = useState<string>("");
   const [analyticsEndDate, setAnalyticsEndDate] = useState<string>("");
   const [revenueStartMonth, setRevenueStartMonth] = useState<string>("");
@@ -116,6 +123,28 @@ const YouTubeAnalytics: React.FC = () => {
     setRevenueEndMonth(firstDayThisMonth.toISOString().slice(0, 7));
   }, [gapiLoaded]);
 
+  const fetchUserChannels = async () => {
+    try {
+      await window.gapi.client.load("youtube", "v3");
+      const response = await window.gapi.client.youtube.channels.list({
+        part: "snippet,contentOwnerDetails",
+        mine: true,
+        maxResults: 50
+      });
+
+      const channelList: Channel[] = response.result.items.map((item: any) => ({
+        id: item.id,
+        title: item.snippet.title,
+        thumbnail: item.snippet.thumbnails.default.url
+      }));
+      
+      setChannels(channelList);
+    } catch (err) {
+      console.error("Error fetching channels:", err);
+      setError("Failed to fetch channels");
+    }
+  };
+
   const authenticate = async () => {
     if (!gisLoaded || !gapiLoaded) return alert("Google scripts not loaded yet");
 
@@ -129,6 +158,7 @@ const YouTubeAnalytics: React.FC = () => {
           localStorage.setItem("yt_token", tokenResponse.access_token);
 
           await window.gapi.client.load("youtubeAnalytics", "v2");
+          await window.gapi.client.load("youtube", "v3");
 
           const userRes = await window.gapi.client.youtube.channels.list({
             part: "snippet",
@@ -137,6 +167,9 @@ const YouTubeAnalytics: React.FC = () => {
           const name = userRes.result.items[0].snippet.title;
           setUserName(name);
           localStorage.setItem("yt_name", name);
+
+          // Fetch user's channels after authentication
+          await fetchUserChannels();
         }
       },
     });
@@ -493,23 +526,60 @@ const fetchRevenue = async () => {
         ) : null}
       </div>
 
+      {isSignedIn && channels.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold mb-4 text-gray-800">Your YouTube Channels</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {channels.map((channel) => (
+              <div
+                key={channel.id}
+                onClick={() => {
+                  setChannelId(channel.id);
+                  fetchPublicStats(channel.id);
+                }}
+                className="bg-white p-4 rounded-lg shadow-sm border cursor-pointer hover:shadow-md transition-shadow duration-200"
+              >
+                <div className="flex items-center space-x-3">
+                  <img
+                    src={channel.thumbnail}
+                    alt={channel.title}
+                    className="w-10 h-10 rounded-full"
+                  />
+                  <div>
+                    <h4 className="font-medium text-gray-900 line-clamp-1">{channel.title}</h4>
+                    <p className="text-sm text-gray-500">ID: {channel.id}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <form
         onSubmit={handleSubmit}
         className="mb-4 flex gap-2 flex-wrap justify-center"
       >
-        <input
-          type="text"
-          placeholder="Enter public channel ID"
-          value={channelId}
-          onChange={(e) => setChannelId(e.target.value)}
-          className="border p-2 grow rounded max-w-xs"
-        />
-        <button
-          type="submit"
-          className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-        >
-          Fetch Public Stats
-        </button>
+        <div className="w-full max-w-xl">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Search Other Channel
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Enter public channel ID"
+              value={channelId}
+              onChange={(e) => setChannelId(e.target.value)}
+              className="border p-2 grow rounded"
+            />
+            <button
+              type="submit"
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 whitespace-nowrap"
+            >
+              Fetch Public Stats
+            </button>
+          </div>
+        </div>
       </form>
 
       {stats && (
