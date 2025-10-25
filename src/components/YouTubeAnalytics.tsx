@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 
 // OAuth credentials
+// OAuth credentials
 const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 
@@ -33,6 +34,7 @@ const YouTubeAnalytics: React.FC = () => {
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [analytics, setAnalytics] = useState<any>(null);
+  const [revenue, setRevenue] = useState<any>(null);
   const [channelId, setChannelId] = useState("");
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,6 +107,25 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
+  // Fetch your own earnings
+  const fetchRevenue = async (): Promise<void> => {
+    if (!isSignedIn) return alert("Please authenticate first");
+    try {
+      const response = await window.gapi.client.youtubeAnalytics.reports.query({
+        ids: "channel==MINE",
+        startDate: "2025-01-01",
+        endDate: "2025-12-31",
+        metrics: "estimatedRevenue,adRevenue,transactionRevenue",
+        dimensions: "month",
+        sort: "month",
+      });
+      setRevenue(response.result);
+      console.log("Revenue response:", response);
+    } catch (err) {
+      console.error("Revenue fetch error", err);
+    }
+  };
+
   // Fetch public channel stats
   const fetchPublicStats = async (id: string) => {
     setLoading(true);
@@ -141,7 +162,7 @@ const YouTubeAnalytics: React.FC = () => {
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <div className="p-4 max-w-5xl mx-auto">
       <h2 className="text-3xl font-bold mb-6">Ayoba YouTube Analytics Dashboard</h2>
 
       <div className="mb-6 flex flex-wrap gap-3">
@@ -158,6 +179,13 @@ const YouTubeAnalytics: React.FC = () => {
         >
           Fetch My Analytics
         </button>
+        <button
+          onClick={fetchRevenue}
+          disabled={!isSignedIn}
+          className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
+        >
+          Fetch My Revenue
+        </button>
       </div>
 
       {analytics && (
@@ -166,6 +194,15 @@ const YouTubeAnalytics: React.FC = () => {
           <p>Total Rows: {analytics.rows?.length || 0}</p>
           <pre className="text-sm max-h-60 overflow-auto">
             {JSON.stringify(analytics, null, 2)}
+          </pre>
+        </div>
+      )}
+
+      {revenue && (
+        <div className="mb-6 border p-4 rounded shadow bg-white">
+          <h3 className="font-bold text-xl mb-2">Revenue Overview</h3>
+          <pre className="text-sm max-h-60 overflow-auto">
+            {JSON.stringify(revenue, null, 2)}
           </pre>
         </div>
       )}
