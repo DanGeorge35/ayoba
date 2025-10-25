@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 
 // OAuth credentials
-// OAuth credentials
 const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 
@@ -49,7 +48,7 @@ const YouTubeAnalytics: React.FC = () => {
       window.gapi.load("client:auth2", async () => {
         try {
           await window.gapi.auth2.init({ client_id: CLIENT_ID });
-          setGapiLoaded(true); // mark gapi as loaded AFTER init
+          setGapiLoaded(true);
           console.log("GAPI loaded and auth2 initialized");
         } catch (err) {
           console.error("Error initializing GAPI auth", err);
@@ -58,11 +57,9 @@ const YouTubeAnalytics: React.FC = () => {
     };
     document.body.appendChild(script);
     return () => {
-      // remove script element on cleanup; don't return the removed node
       document.body.removeChild(script);
     };
   }, []);
-
 
   // OAuth login
   const authenticate = async (): Promise<void> => {
@@ -90,7 +87,7 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
-  // Fetch your own analytics
+  // Fetch analytics (views, subscribers)
   const fetchMyAnalytics = async (): Promise<void> => {
     if (!isSignedIn) return alert("Please authenticate first");
     try {
@@ -100,8 +97,8 @@ const YouTubeAnalytics: React.FC = () => {
         endDate: "2025-12-31",
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
-        dimensions: "day",
-        sort: "day",
+        dimensions: "month",
+        sort: "month",
       });
       setAnalytics(response.result);
       console.log("Analytics response:", response);
@@ -110,7 +107,7 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
-  // Fetch your own earnings
+  // Fetch earnings
   const fetchRevenue = async (): Promise<void> => {
     if (!isSignedIn) return alert("Please authenticate first");
     try {
@@ -169,12 +166,12 @@ const YouTubeAnalytics: React.FC = () => {
       <h2 className="text-3xl font-bold mb-6">Ayoba YouTube Analytics Dashboard</h2>
 
       <div className="mb-6 flex flex-wrap gap-3">
-       <button
-        onClick={() => authenticate().then(loadClient)}
-        disabled={!gapiLoaded}
-        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        <button
+          onClick={() => authenticate().then(loadClient)}
+          disabled={!gapiLoaded}
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
         >
-        Authorize & Load
+          Authorize & Load
         </button>
         <button
           onClick={fetchMyAnalytics}
@@ -192,25 +189,61 @@ const YouTubeAnalytics: React.FC = () => {
         </button>
       </div>
 
+      {/* Analytics Summary */}
       {analytics && (
         <div className="mb-6 border p-4 rounded shadow bg-white">
-          <h3 className="font-bold text-xl mb-2">My Channel Analytics</h3>
-          <p>Total Rows: {analytics.rows?.length || 0}</p>
-          <pre className="text-sm max-h-60 overflow-auto">
-            {JSON.stringify(analytics, null, 2)}
-          </pre>
+          <h3 className="font-bold text-xl mb-2">My Channel Analytics (Monthly)</h3>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="px-2 py-1">Month</th>
+                <th className="px-2 py-1">Views</th>
+                <th className="px-2 py-1">Subscribers Gained</th>
+                <th className="px-2 py-1">Watch Minutes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics.rows?.map((row: any[], idx: number) => (
+                <tr key={idx} className="border-b">
+                  <td className="px-2 py-1">{row[0]}</td>
+                  <td className="px-2 py-1">{row[1]}</td>
+                  <td className="px-2 py-1">{row[5]}</td>
+                  <td className="px-2 py-1">{row[2]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
+      {/* Revenue */}
       {revenue && (
         <div className="mb-6 border p-4 rounded shadow bg-white">
-          <h3 className="font-bold text-xl mb-2">Revenue Overview</h3>
-          <pre className="text-sm max-h-60 overflow-auto">
-            {JSON.stringify(revenue, null, 2)}
-          </pre>
+          <h3 className="font-bold text-xl mb-2">Revenue Overview (Monthly)</h3>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="px-2 py-1">Month</th>
+                <th className="px-2 py-1">Estimated Revenue ($)</th>
+                <th className="px-2 py-1">Ad Revenue ($)</th>
+                <th className="px-2 py-1">Transaction Revenue ($)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {revenue.rows?.map((row: any[], idx: number) => (
+                <tr key={idx} className="border-b">
+                  <td className="px-2 py-1">{row[0]}</td>
+                  <td className="px-2 py-1">{row[1]}</td>
+                  <td className="px-2 py-1">{row[2]}</td>
+                  <td className="px-2 py-1">{row[3]}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
+      {/* Public channel stats */}
       <form onSubmit={handleSubmit} className="mb-4 flex gap-2 flex-wrap">
         <input
           type="text"
