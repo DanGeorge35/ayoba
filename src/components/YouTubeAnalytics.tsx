@@ -122,11 +122,11 @@ const fetchRevenue = async (): Promise<void> => {
     const response = await window.gapi.client.youtubeAnalytics.reports.query({
       ids: "channel==MINE",
       startDate: "2025-01-01",
-      endDate: "2025-12-31",
+      endDate: "2025-12-01", // align with month dimension
       metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue",
       dimensions: "month",
       sort: "month",
-      currency: "USD", // optional but recommended
+      currency: "USD",
     });
 
     setRevenue(response.result);
@@ -136,6 +136,7 @@ const fetchRevenue = async (): Promise<void> => {
     setError("Failed to fetch revenue");
   }
 };
+
 
 
   // Fetch public channel stats
