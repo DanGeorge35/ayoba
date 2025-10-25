@@ -179,10 +179,10 @@ const YouTubeAnalytics: React.FC = () => {
         await window.gapi.client.load("youtubeAnalytics", "v2");
 
       const res = await window.gapi.client.youtubeAnalytics.reports.query({
-        ids: "channel==MINE",
+        ids: "contentOwner==MINE",
         startDate,
         endDate,
-        metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue",
+        metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue,estimatedPlaybackBasedCpm,grossRevenue",
         dimensions: "month",
         sort: "month",
         currency: "USD",
@@ -234,12 +234,33 @@ const YouTubeAnalytics: React.FC = () => {
         labels: revenue.rows.map((row: any) => row[0]),
         datasets: [
           {
-            label: "Estimated Revenue (USD)",
+            label: "Estimated Total Revenue (USD)",
             data: revenue.rows.map((row: any) => parseFloat(row[1])),
             backgroundColor: "rgba(255, 206, 86, 0.5)",
             borderColor: "rgba(255, 206, 86, 1)",
             borderWidth: 1,
           },
+          {
+            label: "Ad Revenue (USD)",
+            data: revenue.rows.map((row: any) => parseFloat(row[2])),
+            backgroundColor: "rgba(75, 192, 192, 0.5)",
+            borderColor: "rgba(75, 192, 192, 1)",
+            borderWidth: 1,
+          },
+          {
+            label: "Red Partner Revenue (USD)",
+            data: revenue.rows.map((row: any) => parseFloat(row[3])),
+            backgroundColor: "rgba(255, 99, 132, 0.5)",
+            borderColor: "rgba(255, 99, 132, 1)",
+            borderWidth: 1,
+          },
+          {
+            label: "Gross Revenue (USD)",
+            data: revenue.rows.map((row: any) => parseFloat(row[5])),
+            backgroundColor: "rgba(153, 102, 255, 0.5)",
+            borderColor: "rgba(153, 102, 255, 1)",
+            borderWidth: 1,
+          }
         ],
       }
     : null;
@@ -336,12 +357,40 @@ const YouTubeAnalytics: React.FC = () => {
         </div>
       )}
 
-      {revenueChartData && (
+      {!isSignedIn ? (
+        <p className="text-gray-500 text-center mb-6">
+          Please sign in to view analytics and revenue data.
+        </p>
+      ) : revenue === null ? (
+        <p className="text-gray-500 text-center mb-6">
+          Revenue data is only available for YouTube content owners. Click "Fetch Revenue" to check if you have access.
+        </p>
+      ) : revenueChartData ? (
         <div className="mb-6 border p-4 rounded shadow bg-white">
           <h3 className="font-bold text-xl mb-2">Revenue Chart</h3>
-          <Bar data={revenueChartData} />
+          <Bar 
+            data={revenueChartData} 
+            options={{
+              responsive: true,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  ticks: {
+                    callback: (value) => `$${value}`
+                  }
+                }
+              },
+              plugins: {
+                tooltip: {
+                  callbacks: {
+                    label: (context) => `${context.dataset.label}: $${context.raw}`
+                  }
+                }
+              }
+            }}
+          />
         </div>
-      )}
+      ) : null}
 
       <form
         onSubmit={handleSubmit}
