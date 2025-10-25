@@ -64,8 +64,10 @@ const YouTubeAnalytics: React.FC = () => {
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
+  const [analyticsStartDate, setAnalyticsStartDate] = useState<string>("");
+  const [analyticsEndDate, setAnalyticsEndDate] = useState<string>("");
+  const [revenueStartMonth, setRevenueStartMonth] = useState<string>("");
+  const [revenueEndMonth, setRevenueEndMonth] = useState<string>("");
 
   useEffect(() => {
     const gapiScript = document.createElement("script");
@@ -98,12 +100,20 @@ const YouTubeAnalytics: React.FC = () => {
       setUserName(name);
     }
 
-    // Default last 2 months
+    // Set default dates
     const today = new Date();
     const priorDate = new Date();
     priorDate.setMonth(priorDate.getMonth() - 2);
-    setStartDate(priorDate.toISOString().slice(0, 10));
-    setEndDate(today.toISOString().slice(0, 10));
+    
+    // Analytics date range (last 2 months)
+    setAnalyticsStartDate(priorDate.toISOString().slice(0, 10));
+    setAnalyticsEndDate(today.toISOString().slice(0, 10));
+
+    // Revenue months (first day of last month to first day of current month)
+    const firstDayThisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    setRevenueStartMonth(firstDayLastMonth.toISOString().slice(0, 7));
+    setRevenueEndMonth(firstDayThisMonth.toISOString().slice(0, 7));
   }, [gapiLoaded]);
 
   const authenticate = async () => {
@@ -154,8 +164,8 @@ const YouTubeAnalytics: React.FC = () => {
 
       const res = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
-        startDate,
-        endDate,
+        startDate: analyticsStartDate,
+        endDate: analyticsEndDate,
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
         dimensions: "day",
@@ -182,6 +192,9 @@ const fetchRevenue = async () => {
     }
 
     // Try channel-level revenue first (works for normal monetized channels)
+    const startDate = `${revenueStartMonth}-01`;
+    const endDate = `${revenueEndMonth}-01`;
+    
     const res = await window.gapi.client.youtubeAnalytics.reports.query({
     //   ids: "channel==MINE", // channel-level report
       ids: "contentOwner==MINE", // content owner-level report
@@ -340,83 +353,145 @@ const fetchRevenue = async () => {
       </div>
 
       {isSignedIn && (
-        <div className="mb-6 flex flex-wrap gap-3 justify-center items-center">
-          <label>
-            From:{" "}
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="border p-1 rounded"
-            />
-          </label>
-          <label>
-            To:{" "}
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="border p-1 rounded"
-            />
-          </label>
-          <button
-            onClick={fetchMyAnalytics}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-          >
-            Fetch Analytics
-          </button>
-          <button
-            onClick={fetchRevenue}
-            className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
-          >
-            Fetch Revenue
-          </button>
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">Analytics Date Range</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-600 mb-1">From</label>
+                <input
+                  type="date"
+                  value={analyticsStartDate}
+                  onChange={(e) => setAnalyticsStartDate(e.target.value)}
+                  className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-600 mb-1">To</label>
+                <input
+                  type="date"
+                  value={analyticsEndDate}
+                  onChange={(e) => setAnalyticsEndDate(e.target.value)}
+                  className="border p-2 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <button
+                onClick={fetchMyAnalytics}
+                className="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition duration-150"
+              >
+                Fetch Analytics
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">Revenue Period</h3>
+            <div className="space-y-4">
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-600 mb-1">Start Month</label>
+                <input
+                  type="month"
+                  value={revenueStartMonth}
+                  onChange={(e) => setRevenueStartMonth(e.target.value)}
+                  className="border p-2 rounded focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                />
+              </div>
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-600 mb-1">End Month</label>
+                <input
+                  type="month"
+                  value={revenueEndMonth}
+                  onChange={(e) => setRevenueEndMonth(e.target.value)}
+                  className="border p-2 rounded focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                />
+              </div>
+              <button
+                onClick={fetchRevenue}
+                className="w-full bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700 transition duration-150"
+              >
+                Fetch Revenue
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
       {loading && <p className="text-center font-semibold">Loading...</p>}
 
-      {analyticsChartData && (
-        <div className="mb-6 border p-4 rounded shadow bg-white">
-          <h3 className="font-bold text-xl mb-2">Analytics Chart</h3>
-          <Line data={analyticsChartData} />
+      <div className="grid lg:grid-cols-2 gap-6 mb-8">
+        <div className="lg:col-span-2">
+          {!isSignedIn && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-blue-800 text-center">
+                Please sign in to view analytics and revenue data.
+              </p>
+            </div>
+          )}
         </div>
-      )}
 
-      {!isSignedIn ? (
-        <p className="text-gray-500 text-center mb-6">
-          Please sign in to view analytics and revenue data.
-        </p>
-      ) : revenue === null ? (
-        <p className="text-gray-500 text-center mb-6">
-          Revenue data is only available for YouTube content owners. Click "Fetch Revenue" to check if you have access.
-        </p>
-      ) : revenueChartData ? (
-        <div className="mb-6 border p-4 rounded shadow bg-white">
-          <h3 className="font-bold text-xl mb-2">Revenue Chart</h3>
-          <Bar 
-            data={revenueChartData} 
-            options={{
-              responsive: true,
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  ticks: {
-                    callback: (value) => `$${value}`
+        {analyticsChartData && (
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <h3 className="font-bold text-xl mb-4 text-gray-800">Channel Performance</h3>
+            <div className="aspect-4/3 w-full">
+              <Line 
+                data={analyticsChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                    },
+                    title: {
+                      display: false
+                    }
                   }
-                }
-              },
-              plugins: {
-                tooltip: {
-                  callbacks: {
-                    label: (context) => `${context.dataset.label}: $${context.raw}`
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {revenue === null && isSignedIn ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-yellow-800 text-center">
+              Revenue data is only available for YouTube content owners.
+              Click "Fetch Revenue" to check if you have access.
+            </p>
+          </div>
+        ) : revenueChartData ? (
+          <div className="bg-white p-6 rounded-lg shadow-sm border">
+            <h3 className="font-bold text-xl mb-4 text-gray-800">Revenue Overview</h3>
+            <div className="aspect-4/3 w-full">
+              <Bar 
+                data={revenueChartData} 
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: (value) => `$${value}`
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (context) => `${context.dataset.label}: $${context.raw}`
+                      }
+                    }
                   }
-                }
-              }
-            }}
-          />
-        </div>
-      ) : null}
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <form
         onSubmit={handleSubmit}
