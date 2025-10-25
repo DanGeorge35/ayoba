@@ -183,8 +183,8 @@ const fetchRevenue = async () => {
 
     // Try channel-level revenue first (works for normal monetized channels)
     const res = await window.gapi.client.youtubeAnalytics.reports.query({
-      ids: "channel==MINE", // channel-level report
-    //   ids: "contentOwner==MINE", // content owner-level report
+    //   ids: "channel==MINE", // channel-level report
+      ids: "contentOwner==MINE", // content owner-level report
       startDate,
       endDate,
       metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue,grossRevenue",
