@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 
+// OAuth credentials
 // OAuth credentials
 const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
@@ -17,6 +19,7 @@ const SCOPES = [
 declare global {
   interface Window {
     gapi: any;
+    google: any;
   }
 }
 
@@ -31,74 +34,79 @@ interface ChannelStats {
 
 const YouTubeAnalytics: React.FC = () => {
   const [gapiLoaded, setGapiLoaded] = useState(false);
-  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [tokenClient, setTokenClient] = useState<any>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [revenue, setRevenue] = useState<any>(null);
   const [channelId, setChannelId] = useState("");
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  // Load GAPI script
+ 
+  // Load GAPI and GIS scripts
   useEffect(() => {
-    const script = document.createElement("script");
-    script.src = "https://apis.google.com/js/api.js";
-    script.async = true;
-    script.onload = () => {
-      window.gapi.load("client:auth2", async () => {
+    const gapiScript = document.createElement("script");
+    gapiScript.src = "https://apis.google.com/js/api.js";
+    gapiScript.async = true;
+    gapiScript.onload = () => {
+      window.gapi.load("client", async () => {
         try {
-          await window.gapi.auth2.init({ client_id: CLIENT_ID });
+          await window.gapi.client.init({});
           setGapiLoaded(true);
-          console.log("GAPI loaded and auth2 initialized");
+          console.log("GAPI client loaded");
         } catch (err) {
-          console.error("Error initializing GAPI auth", err);
+          console.error("Error initializing GAPI client", err);
         }
       });
     };
-    document.body.appendChild(script);
+    document.body.appendChild(gapiScript);
+
+    const gisScript = document.createElement("script");
+    gisScript.src = "https://accounts.google.com/gsi/client";
+    gisScript.async = true;
+    document.body.appendChild(gisScript);
+
     return () => {
-      document.body.removeChild(script);
+      document.body.removeChild(gapiScript);
+      document.body.removeChild(gisScript);
     };
   }, []);
 
+  // Initialize Token Client
+  useEffect(() => {
+    if (!window.google) return;
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: SCOPES,
+      callback: (tokenResponse: any) => {
+        if (tokenResponse.access_token) {
+          setAccessToken(tokenResponse.access_token);
+          console.log("Access token acquired:", tokenResponse.access_token);
+        }
+      },
+    });
+    setTokenClient(client);
+  }, [window.google]);
+
   // OAuth login
   const authenticate = async (): Promise<void> => {
-    if (!gapiLoaded) return alert("GAPI not loaded yet");
-    try {
-      const GoogleAuth = window.gapi.auth2.getAuthInstance();
-      await GoogleAuth.signIn({ scope: SCOPES });
-      setIsSignedIn(true);
-      console.log("Sign-in successful");
-    } catch (err) {
-      console.error("Error signing in", err);
-    }
+    if (!tokenClient) return alert("Token client not ready");
+    tokenClient.requestAccessToken();
   };
 
-  // Load YouTube Analytics API client
-  const loadClient = async (): Promise<void> => {
-    if (!gapiLoaded) return alert("GAPI not loaded yet");
-    try {
-      await window.gapi.client.load(
-        "https://youtubeanalytics.googleapis.com/$discovery/rest?version=v2"
-      );
-      console.log("GAPI client loaded for API");
-    } catch (err) {
-      console.error("Error loading GAPI client for API", err);
-    }
-  };
-
-  // Fetch analytics (views, subscribers)
+  // Fetch your own analytics
   const fetchMyAnalytics = async (): Promise<void> => {
-    if (!isSignedIn) return alert("Please authenticate first");
+    if (!accessToken) return alert("Authenticate first to get access token");
     try {
+      window.gapi.client.setToken({ access_token: accessToken });
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate: "2025-01-01",
         endDate: "2025-12-31",
         metrics:
           "views,estimatedMinutesWatched,averageViewDuration,averageViewPercentage,subscribersGained",
-        dimensions: "month",
-        sort: "month",
+        dimensions: "day",
+        sort: "day",
       });
       setAnalytics(response.result);
       console.log("Analytics response:", response);
@@ -107,10 +115,11 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
-  // Fetch earnings
+  // Fetch your revenue
   const fetchRevenue = async (): Promise<void> => {
-    if (!isSignedIn) return alert("Please authenticate first");
+    if (!accessToken) return alert("Authenticate first to get access token");
     try {
+      window.gapi.client.setToken({ access_token: accessToken });
       const response = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate: "2025-01-01",
@@ -167,83 +176,46 @@ const YouTubeAnalytics: React.FC = () => {
 
       <div className="mb-6 flex flex-wrap gap-3">
         <button
-          onClick={() => authenticate().then(loadClient)}
-          disabled={!gapiLoaded}
+          onClick={authenticate}
           className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
         >
           Authorize & Load
         </button>
         <button
           onClick={fetchMyAnalytics}
-          disabled={!isSignedIn}
+          disabled={!accessToken}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
         >
           Fetch My Analytics
         </button>
         <button
           onClick={fetchRevenue}
-          disabled={!isSignedIn}
+          disabled={!accessToken}
           className="bg-yellow-600 text-white px-4 py-2 rounded hover:bg-yellow-700"
         >
           Fetch My Revenue
         </button>
       </div>
 
-      {/* Analytics Summary */}
       {analytics && (
         <div className="mb-6 border p-4 rounded shadow bg-white">
-          <h3 className="font-bold text-xl mb-2">My Channel Analytics (Monthly)</h3>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="px-2 py-1">Month</th>
-                <th className="px-2 py-1">Views</th>
-                <th className="px-2 py-1">Subscribers Gained</th>
-                <th className="px-2 py-1">Watch Minutes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {analytics.rows?.map((row: any[], idx: number) => (
-                <tr key={idx} className="border-b">
-                  <td className="px-2 py-1">{row[0]}</td>
-                  <td className="px-2 py-1">{row[1]}</td>
-                  <td className="px-2 py-1">{row[5]}</td>
-                  <td className="px-2 py-1">{row[2]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h3 className="font-bold text-xl mb-2">My Channel Analytics</h3>
+          <p>Total Rows: {analytics.rows?.length || 0}</p>
+          <pre className="text-sm max-h-60 overflow-auto">
+            {JSON.stringify(analytics, null, 2)}
+          </pre>
         </div>
       )}
 
-      {/* Revenue */}
       {revenue && (
         <div className="mb-6 border p-4 rounded shadow bg-white">
-          <h3 className="font-bold text-xl mb-2">Revenue Overview (Monthly)</h3>
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="px-2 py-1">Month</th>
-                <th className="px-2 py-1">Estimated Revenue ($)</th>
-                <th className="px-2 py-1">Ad Revenue ($)</th>
-                <th className="px-2 py-1">Transaction Revenue ($)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {revenue.rows?.map((row: any[], idx: number) => (
-                <tr key={idx} className="border-b">
-                  <td className="px-2 py-1">{row[0]}</td>
-                  <td className="px-2 py-1">{row[1]}</td>
-                  <td className="px-2 py-1">{row[2]}</td>
-                  <td className="px-2 py-1">{row[3]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <h3 className="font-bold text-xl mb-2">Revenue Overview</h3>
+          <pre className="text-sm max-h-60 overflow-auto">
+            {JSON.stringify(revenue, null, 2)}
+          </pre>
         </div>
       )}
 
-      {/* Public channel stats */}
       <form onSubmit={handleSubmit} className="mb-4 flex gap-2 flex-wrap">
         <input
           type="text"
@@ -265,18 +237,12 @@ const YouTubeAnalytics: React.FC = () => {
 
       {stats && (
         <div className="border p-4 rounded shadow bg-white mb-6">
-          <img
-            src={stats.thumbnail}
-            alt={stats.title}
-            className="mb-2 rounded"
-          />
+          <img src={stats.thumbnail} alt={stats.title} className="mb-2 rounded" />
           <h3 className="font-bold text-2xl">{stats.title}</h3>
           <p className="mb-1">Subscribers: {stats.subscribers}</p>
           <p className="mb-1">Views: {stats.views}</p>
           <p className="mb-1">Videos: {stats.videos}</p>
-          {stats.description && (
-            <p className="mt-2 text-gray-700">{stats.description}</p>
-          )}
+          {stats.description && <p className="mt-2 text-gray-700">{stats.description}</p>}
         </div>
       )}
     </div>
