@@ -1,7 +1,30 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Line, Bar } from "react-chartjs-2";
 
-// OAuth credentials
+// Register chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
+
 const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
@@ -41,26 +64,21 @@ const YouTubeAnalytics: React.FC = () => {
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
 
-  // Load GAPI and GIS scripts
   useEffect(() => {
+    // Load GAPI
     const gapiScript = document.createElement("script");
     gapiScript.src = "https://apis.google.com/js/api.js";
     gapiScript.async = true;
     gapiScript.onload = () => {
-      window.gapi.load("client", async () => {
-        setGapiLoaded(true);
-        console.log("GAPI loaded");
-      });
+      window.gapi.load("client", async () => setGapiLoaded(true));
     };
     document.body.appendChild(gapiScript);
 
+    // Load GIS
     const gisScript = document.createElement("script");
     gisScript.src = "https://accounts.google.com/gsi/client";
     gisScript.async = true;
-    gisScript.onload = () => {
-      setGisLoaded(true);
-      console.log("GIS loaded");
-    };
+    gisScript.onload = () => setGisLoaded(true);
     document.body.appendChild(gisScript);
 
     return () => {
@@ -79,7 +97,7 @@ const YouTubeAnalytics: React.FC = () => {
       setUserName(storedName);
     }
 
-    // default 2-month range
+    // Default last 2 months
     const today = new Date();
     const priorDate = new Date();
     priorDate.setMonth(priorDate.getMonth() - 2);
@@ -87,7 +105,6 @@ const YouTubeAnalytics: React.FC = () => {
     setEndDate(today.toISOString().slice(0, 10));
   }, [gapiLoaded]);
 
-  // OAuth login with GIS
   const authenticate = async (): Promise<void> => {
     if (!gisLoaded || !gapiLoaded) return alert("Google scripts not loaded yet");
 
@@ -100,11 +117,9 @@ const YouTubeAnalytics: React.FC = () => {
           setIsSignedIn(true);
           sessionStorage.setItem("yt_token", tokenResponse.access_token);
 
-          // Load YouTube Analytics API
           await window.gapi.client.load("youtubeAnalytics", "v2");
-          console.log("YouTube Analytics API loaded");
 
-          // Fetch user info for name
+          // Get user name
           const userRes = await window.gapi.client.youtube.channels.list({
             part: "snippet",
             mine: true,
@@ -150,7 +165,6 @@ const YouTubeAnalytics: React.FC = () => {
         sort: "day",
       });
       setAnalytics(response.result);
-      console.log("Analytics response:", response);
     } catch (err) {
       console.error("Analytics fetch error", err);
       setError("Failed to fetch analytics");
@@ -174,7 +188,6 @@ const YouTubeAnalytics: React.FC = () => {
         currency: "USD",
       });
       setRevenue(response.result);
-      console.log("Revenue response:", response);
     } catch (err) {
       console.error("Revenue fetch error", err);
       setError("Failed to fetch revenue");
@@ -183,7 +196,6 @@ const YouTubeAnalytics: React.FC = () => {
     }
   };
 
-  // Fetch public channel stats
   const fetchPublicStats = async (id: string) => {
     setLoading(true);
     setError("");
@@ -202,9 +214,7 @@ const YouTubeAnalytics: React.FC = () => {
           videos: ch.statistics.videoCount,
           description: ch.snippet.description,
         });
-      } else {
-        setError("Channel not found");
-      }
+      } else setError("Channel not found");
     } catch (err) {
       console.error(err);
       setError("Failed to fetch channel stats");
@@ -218,9 +228,47 @@ const YouTubeAnalytics: React.FC = () => {
     if (channelId.trim()) fetchPublicStats(channelId.trim());
   };
 
+  // Prepare chart data
+  const revenueChartData = revenue?.rows
+    ? {
+        labels: revenue.rows.map((row: any) => row[0]),
+        datasets: [
+          {
+            label: "Estimated Revenue (USD)",
+            data: revenue.rows.map((row: any) => parseFloat(row[1])),
+            backgroundColor: "rgba(255, 206, 86, 0.5)",
+            borderColor: "rgba(255, 206, 86, 1)",
+            borderWidth: 1,
+          },
+        ],
+      }
+    : null;
+
+  const analyticsChartData = analytics?.rows
+    ? {
+        labels: analytics.rows.map((row: any) => row[0]),
+        datasets: [
+          {
+            label: "Views",
+            data: analytics.rows.map((row: any) => parseInt(row[1], 10)),
+            borderColor: "rgba(54, 162, 235, 1)",
+            backgroundColor: "rgba(54, 162, 235, 0.2)",
+          },
+          {
+            label: "Subscribers Gained",
+            data: analytics.rows.map((row: any) => parseInt(row[5], 10)),
+            borderColor: "rgba(255, 99, 132, 1)",
+            backgroundColor: "rgba(255, 99, 132, 0.2)",
+          },
+        ],
+      }
+    : null;
+
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      <h2 className="text-3xl font-bold mb-6 text-center">Ayoba YouTube Analytics Dashboard</h2>
+      <h2 className="text-3xl font-bold mb-6 text-center">
+        Ayoba YouTube Analytics Dashboard
+      </h2>
 
       <div className="mb-6 flex flex-wrap gap-3 justify-center items-center">
         {!isSignedIn ? (
@@ -281,26 +329,24 @@ const YouTubeAnalytics: React.FC = () => {
 
       {loading && <p className="text-center font-semibold">Loading...</p>}
 
-      {analytics && (
-        <div className="mb-6 border p-4 rounded shadow bg-white overflow-auto">
-          <h3 className="font-bold text-xl mb-2">My Channel Analytics</h3>
-          <p>Total Rows: {analytics.rows?.length || 0}</p>
-          <pre className="text-sm max-h-60 overflow-auto">
-            {JSON.stringify(analytics, null, 2)}
-          </pre>
+      {analyticsChartData && (
+        <div className="mb-6 border p-4 rounded shadow bg-white">
+          <h3 className="font-bold text-xl mb-2">Analytics Chart</h3>
+          <Line data={analyticsChartData} />
         </div>
       )}
 
-      {revenue && (
-        <div className="mb-6 border p-4 rounded shadow bg-white overflow-auto">
-          <h3 className="font-bold text-xl mb-2">Revenue Overview</h3>
-          <pre className="text-sm max-h-60 overflow-auto">
-            {JSON.stringify(revenue, null, 2)}
-          </pre>
+      {revenueChartData && (
+        <div className="mb-6 border p-4 rounded shadow bg-white">
+          <h3 className="font-bold text-xl mb-2">Revenue Chart</h3>
+          <Bar data={revenueChartData} />
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="mb-4 flex gap-2 flex-wrap justify-center">
+      <form
+        onSubmit={handleSubmit}
+        className="mb-4 flex gap-2 flex-wrap justify-center"
+      >
         <input
           type="text"
           placeholder="Enter public channel ID"
@@ -318,16 +364,24 @@ const YouTubeAnalytics: React.FC = () => {
 
       {stats && (
         <div className="border p-4 rounded shadow bg-white mb-6 flex flex-col items-center">
-          <img src={stats.thumbnail} alt={stats.title} className="mb-2 rounded w-40 h-40 object-cover" />
+          <img
+            src={stats.thumbnail}
+            alt={stats.title}
+            className="mb-2 rounded w-40 h-40 object-cover"
+          />
           <h3 className="font-bold text-2xl">{stats.title}</h3>
           <p className="mb-1">Subscribers: {stats.subscribers}</p>
           <p className="mb-1">Views: {stats.views}</p>
           <p className="mb-1">Videos: {stats.videos}</p>
-          {stats.description && <p className="mt-2 text-gray-700 text-center">{stats.description}</p>}
+          {stats.description && (
+            <p className="mt-2 text-gray-700 text-center">{stats.description}</p>
+          )}
         </div>
       )}
 
-      {error && <p className="text-red-500 text-center font-semibold">{error}</p>}
+      {error && (
+        <p className="text-red-500 text-center font-semibold">{error}</p>
+      )}
     </div>
   );
 };
