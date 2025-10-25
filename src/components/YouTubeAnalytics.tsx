@@ -49,7 +49,8 @@ const YouTubeAnalytics: React.FC = () => {
       window.gapi.load("client:auth2", async () => {
         try {
           await window.gapi.auth2.init({ client_id: CLIENT_ID });
-          setGapiLoaded(true);
+          setGapiLoaded(true); // mark gapi as loaded AFTER init
+          console.log("GAPI loaded and auth2 initialized");
         } catch (err) {
           console.error("Error initializing GAPI auth", err);
         }
@@ -57,9 +58,11 @@ const YouTubeAnalytics: React.FC = () => {
     };
     document.body.appendChild(script);
     return () => {
+      // remove script element on cleanup; don't return the removed node
       document.body.removeChild(script);
     };
   }, []);
+
 
   // OAuth login
   const authenticate = async (): Promise<void> => {
@@ -166,11 +169,12 @@ const YouTubeAnalytics: React.FC = () => {
       <h2 className="text-3xl font-bold mb-6">Ayoba YouTube Analytics Dashboard</h2>
 
       <div className="mb-6 flex flex-wrap gap-3">
-        <button
-          onClick={() => authenticate().then(loadClient)}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+       <button
+        onClick={() => authenticate().then(loadClient)}
+        disabled={!gapiLoaded}
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
         >
-          Authorize & Load
+        Authorize & Load
         </button>
         <button
           onClick={fetchMyAnalytics}
@@ -213,7 +217,7 @@ const YouTubeAnalytics: React.FC = () => {
           placeholder="Enter public channel ID"
           value={channelId}
           onChange={(e) => setChannelId(e.target.value)}
-          className="border p-2 flex-grow rounded"
+          className="border p-2 grow rounded"
         />
         <button
           type="submit"
