@@ -59,6 +59,8 @@ interface Channel {
   thumbnail: string;
 }
 
+type RevenueReportType = 'channel' | 'contentOwner';
+
 const YouTubeAnalytics: React.FC = () => {
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
@@ -71,6 +73,7 @@ const YouTubeAnalytics: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [revenueReportType, setRevenueReportType] = useState<RevenueReportType>('channel');
   const [analyticsStartDate, setAnalyticsStartDate] = useState<string>("");
   const [analyticsEndDate, setAnalyticsEndDate] = useState<string>("");
   const [revenueStartMonth, setRevenueStartMonth] = useState<string>("");
@@ -229,8 +232,7 @@ const fetchRevenue = async () => {
     const endDate = `${revenueEndMonth}-01`;
     
     const res = await window.gapi.client.youtubeAnalytics.reports.query({
-    //   ids: "channel==MINE", // channel-level report
-      ids: "contentOwner==MINE", // content owner-level report
+      ids: revenueReportType === 'channel' ? "channel==MINE" : "contentOwner==MINE",
       startDate,
       endDate,
       metrics: "estimatedRevenue,estimatedAdRevenue,estimatedRedPartnerRevenue,grossRevenue",
@@ -242,7 +244,9 @@ const fetchRevenue = async () => {
     // Check if data exists
     if (!res.result || !res.result.rows || res.result.rows.length === 0) {
       setError(
-        "Revenue data is unavailable. Only monetized channels or YouTube Content Owners have access."
+        revenueReportType === 'channel'
+          ? "Channel revenue data is unavailable. Your channel might not be monetized."
+          : "Content owner revenue data is unavailable. You might not have content owner access."
       );
       return;
     }
@@ -253,11 +257,15 @@ const fetchRevenue = async () => {
 
     if (err.status === 404) {
       setError(
-        "Revenue data not found. Only YouTube Content Owners (MCNs) can access content owner reports."
+        revenueReportType === 'channel'
+          ? "Revenue data not found. Please ensure your channel is monetized."
+          : "Revenue data not found. Only YouTube Content Owners (MCNs) can access content owner reports."
       );
     } else if (err.result?.error?.errors?.some((e: any) => e.reason === "invalid")) {
       setError(
-        "Revenue fetch failed: invalid metrics requested or access not allowed."
+        `Revenue fetch failed: ${revenueReportType === 'channel' 
+          ? 'channel-level metrics are not accessible' 
+          : 'content owner-level metrics are not accessible'}`
       );
     } else {
       setError("Failed to fetch revenue data.");
@@ -420,6 +428,17 @@ const fetchRevenue = async () => {
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <h3 className="text-lg font-semibold mb-4 text-gray-800">Revenue Period</h3>
             <div className="space-y-4">
+              <div className="flex flex-col">
+                <label className="text-sm text-gray-600 mb-1">Report Type</label>
+                <select
+                  value={revenueReportType}
+                  onChange={(e) => setRevenueReportType(e.target.value as RevenueReportType)}
+                  className="border p-2 rounded focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                >
+                  <option value="channel">Channel Level</option>
+                  <option value="contentOwner">Content Owner Level</option>
+                </select>
+              </div>
               <div className="flex flex-col">
                 <label className="text-sm text-gray-600 mb-1">Start Month</label>
                 <input
