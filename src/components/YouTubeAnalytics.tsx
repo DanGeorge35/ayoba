@@ -90,10 +90,31 @@ const YouTubeAnalytics: React.FC = () => {
   }, [window.google]);
 
   // OAuth login
-  const authenticate = async (): Promise<void> => {
-    if (!tokenClient) return alert("Token client not ready");
-    tokenClient.requestAccessToken();
-  };
+const authenticate = async (): Promise<void> => {
+  if (!tokenClient) return alert("Token client not ready");
+  tokenClient.requestAccessToken();
+  
+  // Wait a bit for access token to be set
+  const interval = setInterval(() => {
+    if (accessToken) {
+      clearInterval(interval);
+      loadAnalyticsClient();
+    }
+  }, 100);
+};
+
+const loadAnalyticsClient = async () => {
+  try {
+    await window.gapi.client.load(
+      "youtubeAnalytics", 
+      "v2"
+    );
+    console.log("YouTube Analytics API loaded");
+  } catch (err) {
+    console.error("Failed to load YouTube Analytics API", err);
+  }
+};
+
 
   // Fetch your own analytics
   const fetchMyAnalytics = async (): Promise<void> => {
