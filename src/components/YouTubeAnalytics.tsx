@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 
 // OAuth credentials
 const CLIENT_ID =
-  "943556130775-fbsgln3igbohm502mhhomn0e8c2895gj.apps.googleusercontent.com";
+  "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 
 // API key for public stats
 const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
