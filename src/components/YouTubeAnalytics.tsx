@@ -78,6 +78,8 @@ const YouTubeAnalytics: React.FC = () => {
   const [analyticsEndDate, setAnalyticsEndDate] = useState<string>("");
   const [revenueStartMonth, setRevenueStartMonth] = useState<string>("");
   const [revenueEndMonth, setRevenueEndMonth] = useState<string>("");
+  const [videoRevenues, setVideoRevenues] = useState<any[]>([]);
+  const [isFetchingVideos, setIsFetchingVideos] = useState(false);
 
   useEffect(() => {
     const gapiScript = document.createElement("script");
@@ -306,6 +308,74 @@ const fetchRevenue = async () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (channelId.trim()) fetchPublicStats(channelId.trim());
+  };
+
+  const fetchVideoRevenues = async () => {
+    if (!isSignedIn) return;
+    setIsFetchingVideos(true);
+    setError("");
+    setVideoRevenues([]);
+
+    try {
+      // 1. Get uploads playlist ID
+      const channelResponse = await window.gapi.client.youtube.channels.list({
+        mine: true,
+        part: "contentDetails",
+      });
+      const uploadsPlaylistId =
+        channelResponse.result.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+
+      if (!uploadsPlaylistId) {
+        setError("Could not find your uploads playlist.");
+        setIsFetchingVideos(false);
+        return;
+      }
+
+      // 2. Get all video IDs from the playlist
+      let nextPageToken: string | undefined = undefined;
+      const allVideos: any[] = [];
+      do {
+        const playlistItemsResponse: any = await window.gapi.client.youtube.playlistItems.list({
+          playlistId: uploadsPlaylistId,
+          part: "snippet,contentDetails",
+          maxResults: 50,
+          pageToken: nextPageToken,
+        });
+
+        const items = playlistItemsResponse.result.items || [];
+        allVideos.push(...items);
+        nextPageToken = playlistItemsResponse.result.nextPageToken || undefined;
+      } while (nextPageToken);
+
+      // 3. Fetch revenue for each video
+      const videoRevenueData = [];
+      for (const video of allVideos) {
+        const videoId = video.contentDetails.videoId;
+        const response = await window.gapi.client.youtubeAnalytics.reports.query({
+          ids: "channel==MINE",
+          startDate: analyticsStartDate,
+          endDate: analyticsEndDate,
+          metrics: "estimatedRevenue",
+          dimensions: "video",
+          filters: `video==${videoId}`,
+        });
+
+        const revenue = response.result.rows?.[0]?.[1] ?? 0;
+        videoRevenueData.push({
+          id: videoId,
+          title: video.snippet.title,
+          thumbnail: video.snippet.thumbnails.default.url,
+          revenue: revenue,
+        });
+      }
+
+      setVideoRevenues(videoRevenueData);
+    } catch (err) {
+      console.error("Error fetching video revenues:", err);
+      setError("Failed to fetch video revenues.");
+    } finally {
+      setIsFetchingVideos(false);
+    }
   };
 
   // Chart data
@@ -620,6 +690,61 @@ const fetchRevenue = async () => {
 
       {error && (
         <p className="text-red-500 text-center font-semibold">{error}</p>
+      )}
+
+      {isSignedIn && (
+        <div className="mt-8">
+          <div className="flex justify-center mb-4">
+            <button
+              onClick={fetchVideoRevenues}
+              disabled={isFetchingVideos}
+              className="bg-teal-600 text-white px-6 py-2 rounded hover:bg-teal-700 disabled:bg-gray-400"
+            >
+              {isFetchingVideos ? "Fetching Video Revenues..." : "Fetch Video Revenues"}
+            </button>
+          </div>
+
+          {isFetchingVideos && <p className="text-center font-semibold">Loading video revenues...</p>}
+
+          {videoRevenues.length > 0 && (
+            <div className="bg-white p-6 rounded-lg shadow-sm border mt-6">
+              <h3 className="font-bold text-xl mb-4 text-gray-800">Video Revenue Details</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Video
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Estimated Revenue (USD)
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {videoRevenues.map((video) => (
+                      <tr key={video.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="shrink-0 h-10 w-10">
+                              <img className="h-10 w-10 rounded-full" src={video.thumbnail} alt="" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{video.title}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">${video.revenue.toFixed(2)}</div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
