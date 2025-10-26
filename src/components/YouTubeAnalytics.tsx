@@ -59,15 +59,90 @@ interface Channel {
   thumbnail: string;
 }
 
+// --- API response payload interfaces ---
+interface GapiChannelItem {
+  id: string;
+  snippet: {
+    title: string;
+    thumbnails?: {
+      default?: { url: string };
+      high?: { url: string };
+    };
+    description?: string;
+  };
+  contentDetails?: {
+    relatedPlaylists?: {
+      uploads?: string;
+    };
+  };
+  statistics?: {
+    subscriberCount?: string;
+    viewCount?: string;
+    videoCount?: string;
+  };
+}
+
+interface YouTubeChannelsListResponse {
+  result: {
+    items: GapiChannelItem[];
+  };
+}
+
+interface PlaylistItem {
+  contentDetails: { videoId: string };
+  snippet: {
+    title: string;
+    thumbnails?: { default?: { url: string } };
+  };
+}
+
+interface PlaylistItemsListResponse {
+  result: {
+    items: PlaylistItem[];
+    nextPageToken?: string;
+  };
+}
+
+type AnalyticsRow = Array<string | number>;
+
+interface YouTubeAnalyticsReportResponse {
+  result: {
+    rows?: AnalyticsRow[];
+    columnHeaders?: Array<{ name: string; columnType?: string; dataType?: string }>;
+  };
+}
+
+interface PublicChannelApiResponse {
+  items?: Array<{
+    snippet: {
+      title: string;
+      thumbnails?: { high?: { url: string } };
+      description?: string;
+    };
+    statistics?: {
+      subscriberCount?: string;
+      viewCount?: string;
+      videoCount?: string;
+    };
+  }>;
+}
+
 type RevenueReportType = 'channel' | 'contentOwner';
+
+interface VideoRevenueItem {
+  id: string;
+  title: string;
+  thumbnail: string;
+  revenue: number;
+}
 
 const YouTubeAnalytics: React.FC = () => {
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [userName, setUserName] = useState("");
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [revenue, setRevenue] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<YouTubeAnalyticsReportResponse['result'] | null>(null);
+  const [revenue, setRevenue] = useState<YouTubeAnalyticsReportResponse['result'] | null>(null);
   const [channelId, setChannelId] = useState("");
   const [stats, setStats] = useState<ChannelStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -78,7 +153,7 @@ const YouTubeAnalytics: React.FC = () => {
   const [analyticsEndDate, setAnalyticsEndDate] = useState<string>("");
   const [revenueStartMonth, setRevenueStartMonth] = useState<string>("");
   const [revenueEndMonth, setRevenueEndMonth] = useState<string>("");
-  const [videoRevenues, setVideoRevenues] = useState<any[]>([]);
+  const [videoRevenues, setVideoRevenues] = useState<VideoRevenueItem[]>([]);
   const [isFetchingVideos, setIsFetchingVideos] = useState(false);
 
   useEffect(() => {
@@ -131,16 +206,16 @@ const YouTubeAnalytics: React.FC = () => {
   const fetchUserChannels = async () => {
     try {
       await window.gapi.client.load("youtube", "v3");
-      const response = await window.gapi.client.youtube.channels.list({
+      const response: YouTubeChannelsListResponse = await window.gapi.client.youtube.channels.list({
         part: "snippet,contentOwnerDetails",
         mine: true,
         maxResults: 50
       });
 
-      const channelList: Channel[] = response.result.items.map((item: any) => ({
+      const channelList: Channel[] = response.result.items.map((item: GapiChannelItem) => ({
         id: item.id,
         title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.default.url
+        thumbnail: item.snippet.thumbnails?.default?.url ?? ""
       }));
       
       setChannels(channelList);
@@ -200,7 +275,7 @@ const YouTubeAnalytics: React.FC = () => {
       if (!window.gapi.client.youtubeAnalytics)
         await window.gapi.client.load("youtubeAnalytics", "v2");
 
-      const res = await window.gapi.client.youtubeAnalytics.reports.query({
+      const res: YouTubeAnalyticsReportResponse = await window.gapi.client.youtubeAnalytics.reports.query({
         ids: "channel==MINE",
         startDate: analyticsStartDate,
         endDate: analyticsEndDate,
@@ -233,7 +308,7 @@ const fetchRevenue = async () => {
     const startDate = `${revenueStartMonth}-01`;
     const endDate = `${revenueEndMonth}-01`;
     
-    const res = await window.gapi.client.youtubeAnalytics.reports.query({
+    const res: YouTubeAnalyticsReportResponse = await window.gapi.client.youtubeAnalytics.reports.query({
       ids: revenueReportType === 'channel' ? "channel==MINE" : "contentOwner==MINE",
       startDate,
       endDate,
@@ -285,16 +360,16 @@ const fetchRevenue = async () => {
       const res = await fetch(
         `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&id=${id}&key=${API_KEY}`
       );
-      const data = await res.json();
+  const data: PublicChannelApiResponse = await res.json();
       if (data.items && data.items.length > 0) {
         const ch = data.items[0];
         setStats({
           title: ch.snippet.title,
-          thumbnail: ch.snippet.thumbnails.high.url,
-          subscribers: ch.statistics.subscriberCount,
-          views: ch.statistics.viewCount,
-          videos: ch.statistics.videoCount,
-          description: ch.snippet.description,
+          thumbnail: ch.snippet.thumbnails?.high?.url ?? "",
+          subscribers: ch.statistics?.subscriberCount ?? "0",
+          views: ch.statistics?.viewCount ?? "0",
+          videos: ch.statistics?.videoCount ?? "0",
+          description: ch.snippet.description ?? undefined,
         });
       } else setError("Channel not found");
     } catch (err) {
@@ -318,7 +393,7 @@ const fetchRevenue = async () => {
 
     try {
       // 1. Get uploads playlist ID
-      const channelResponse = await window.gapi.client.youtube.channels.list({
+      const channelResponse: YouTubeChannelsListResponse = await window.gapi.client.youtube.channels.list({
         mine: true,
         part: "contentDetails",
       });
@@ -335,7 +410,7 @@ const fetchRevenue = async () => {
       let nextPageToken: string | undefined = undefined;
       const allVideos: any[] = [];
       do {
-        const playlistItemsResponse: any = await window.gapi.client.youtube.playlistItems.list({
+        const playlistItemsResponse: PlaylistItemsListResponse = await window.gapi.client.youtube.playlistItems.list({
           playlistId: uploadsPlaylistId,
           part: "snippet,contentDetails",
           maxResults: 50,
@@ -348,10 +423,10 @@ const fetchRevenue = async () => {
       } while (nextPageToken);
 
       // 3. Fetch revenue for each video
-      const videoRevenueData = [];
+      const videoRevenueData: VideoRevenueItem[] = [];
       for (const video of allVideos) {
         const videoId = video.contentDetails.videoId;
-        const response = await window.gapi.client.youtubeAnalytics.reports.query({
+        const response: YouTubeAnalyticsReportResponse = await window.gapi.client.youtubeAnalytics.reports.query({
           ids: "channel==MINE",
           startDate: analyticsStartDate,
           endDate: analyticsEndDate,
@@ -360,12 +435,14 @@ const fetchRevenue = async () => {
           filters: `video==${videoId}`,
         });
 
-        const revenue = response.result.rows?.[0]?.[1] ?? 0;
+        const revenueValue = response.result.rows?.[0]?.[1] ?? 0;
+        const revenueNumber = typeof revenueValue === 'string' ? Number(revenueValue) : (revenueValue as number);
+
         videoRevenueData.push({
           id: videoId,
           title: video.snippet.title,
-          thumbnail: video.snippet.thumbnails.default.url,
-          revenue: revenue,
+          thumbnail: video.snippet.thumbnails?.default?.url ?? "",
+          revenue: Number.isFinite(revenueNumber) ? revenueNumber : 0,
         });
       }
 
