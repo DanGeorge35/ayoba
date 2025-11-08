@@ -1,50 +1,42 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import YouTubeAnalytics from "./components/YouTubeAnalytics";
+import { Routes, Route, } from "react-router-dom";
 import TermsOfService from "./components/TermsOfService";
 import PrivacyPolicy from "./components/PrivacyPolicy";
+import AdminLogin from "./pages/AdminLogin";
+import "./App.css";
+import "slick-carousel/slick/slick.css";
+import "slick-carousel/slick/slick-theme.css";
 
-const App: React.FC = () => {
+function App() {
+  // const location = useLocation();
+
+  // Check if the current route starts with "/admin" (for possible admin layouts)
+  // const isAdminRoute = location.pathname.startsWith("/admin");
+
   return (
-    <Router>
-      <div className="flex flex-col min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex justify-between items-center">
-              <Link to="/" className="text-xl font-bold text-gray-800">
-                Ayooba YouTube Analytics
-              </Link>
-            
-            </div>
-          </div>
-        </nav>
+    <div className="">
+      <div className="">
+        <Routes>
+          {/* Default Route */}
+          <Route path="/" element={<AdminLogin />} />
 
-        <main className="grow">
-          <Routes>
-            <Route path="/" element={<YouTubeAnalytics />} />
-            <Route path="/terms" element={<TermsOfService />} />
-            <Route path="/privacy" element={<PrivacyPolicy />} />
-          </Routes>
-        </main>
+          {/* Auth/Policy Routes */}
+          {/* <Route path="/forgetpass" element={<ForgetPassword />} /> */}
+          {/* <Route path="/verification" element={<Verification />} /> */}
+          {/* <Route path="/resetpass" element={<ResetPassword />} /> */}
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
 
-        <footer className="bg-white shadow-sm">
-          <div className="container mx-auto px-4 py-6">
-            <div className="text-center text-gray-600">
-              <p>© 2025 Ayoba. All rights reserved.</p>
-              <div className="mt-2 space-x-4">
-                <Link to="/terms" className="hover:text-gray-800">
-                  Terms of Service
-                </Link>
-                <Link to="/privacy" className="hover:text-gray-800">
-                  Privacy Policy
-                </Link>
-              </div>
-            </div>
-          </div>
-        </footer>
+          {/* Other Routes */}
+          {/* <Route path="/quiz/:projectId" element={<Quiz />} /> */}
+          {/* <Route path="/result/:projectId/:userId" element={<Result />} /> */}
+          {/* <Route path="/admin/*" element={<Dashboard />} /> */}
+        </Routes>
       </div>
-    </Router>
+
+      {/* Optional Footer Display */}
+      {/* {!isAdminRoute && <Footer />} */}
+    </div>
   );
-};
+}
 
 export default App;
