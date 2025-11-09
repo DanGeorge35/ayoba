@@ -19,9 +19,12 @@
     "react-router-dom": "^7.9.4",
     "recharts": "^3.3.0",
     "slick-carousel": "^1.8.1",
-    "tailwindcss": "^4.1.16"
+    "tailwindcss": "^4.1.16",
+    "lucide-react": "^0.553.0",
+    "react-slick": "^0.31.0"
   },
   "devDependencies": {
+    "@types/react-slick": "^0.23.13",
     "@eslint/js": "^9.36.0",
     "@types/node": "^24.6.0",
     "@types/react": "^19.1.16",

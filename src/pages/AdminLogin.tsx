@@ -71,6 +71,7 @@ export default function AdminLogin() {
         // await sendPasswordResetEmail(form.email);
         setMessage("If this email exists, a password reset link has been sent.");
       } else {
+      
         const result: AuthResponse = isNew
           ? await registerAdmin(form)
           : await loginAdmin(form.email, form.password);
@@ -95,9 +96,9 @@ export default function AdminLogin() {
   if (user === undefined) return <p className="p-8">Checking login...</p>;
 
   return (
-    <div className="w-full min-h-screen grid grid-cols-1 md:grid-cols-2">
+    <div className="w-full min-h-screen grid grid-cols-1 lg:grid-cols-2">
       {/* Sidebar Carousel */}
-      <div className="hidden md:block text-white bg-[#e1252f] ">
+      <div className="hidden lg:block text-white bg-[#e1252f] ">
         <div className="min-h-screen flex items-center justify-center overflow-hidden max-w-7xl" style={{width:"100%"}}>
           <SidebarCarousel />
         </div>
@@ -105,9 +106,9 @@ export default function AdminLogin() {
 
       {/* Form Section */}
       <div className="relative min-h-screen flex items-center justify-center overflow-hidden max-w-5xl w-[90%] mx-auto">
-        <div className="bg-white w-full max-w-md overflow-y-auto space-y-4 py-16 px-8 hide-scrollbar rounded-lg ">
+        <div className="bg-white w-full max-w-md overflow-y-auto space-y-4 py-16 px-3 hide-scrollbar rounded-lg ">
           <div className="flex justify-center mb-6">
-            <img src={logo} alt="Quiz Logo" className="h-14" />
+            <img src={logo} alt="Ayouba Logo" className="h-10" />
           </div>
 
           <h5 className="text-[25px] font-bold text-[#e1252f] mb-4 text-center">
@@ -185,8 +186,8 @@ export default function AdminLogin() {
             )}
 
             {!forgotPassword && (
-              <div className="flex justify-between items-center text-sm mt-4">
-                <div className="flex items-center space-x-2">
+              <div className="flex justify-between items-center text-sm mt-4 py-4">
+                <div className="flex items-center space-x-2 ">
                   <input
                     id="remember"
                     type="checkbox"
