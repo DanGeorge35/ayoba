@@ -5,6 +5,8 @@ import AdminLogin from "./pages/AdminLogin";
 import "./App.css";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
+import Dashboard from "./pages/admin/Dashboard";
+ 
 
 function App() {
   // const location = useLocation();
@@ -18,18 +20,13 @@ function App() {
         <Routes>
           {/* Default Route */}
           <Route path="/" element={<AdminLogin />} />
-
-          {/* Auth/Policy Routes */}
-          {/* <Route path="/forgetpass" element={<ForgetPassword />} /> */}
-          {/* <Route path="/verification" element={<Verification />} /> */}
-          {/* <Route path="/resetpass" element={<ResetPassword />} /> */}
+ 
+          <Route path="/account/*" element={<Dashboard />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
 
-          {/* Other Routes */}
-          {/* <Route path="/quiz/:projectId" element={<Quiz />} /> */}
-          {/* <Route path="/result/:projectId/:userId" element={<Result />} /> */}
-          {/* <Route path="/admin/*" element={<Dashboard />} /> */}
+ 
+    
         </Routes>
       </div>
 

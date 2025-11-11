@@ -18,6 +18,26 @@ export interface LoginAdminParams {
   password: string;
 }
 
+export interface LoginUser {
+  access_token: string;
+  user: {
+    business_name: string;
+    code: string;
+    email: string;
+    email_verified: boolean;
+    enabled_2fa: boolean;
+    first_name: string;
+    id: string;
+    last_login: string | null;
+    last_name: string;
+    otp_count: number;
+    phone_number: string;
+    phone_number_verified: boolean;
+    role: string;
+    status: string;
+  };
+}
+
 export interface AuthResponse {
   access_token: string;
   [key: string]: any; // In case API returns extra fields
@@ -34,18 +54,24 @@ export const loginAdmin = async (
   email: string,
   password: string
 ): Promise<AuthResponse | any> => {
-  return apiLoginAdmin({ email, password });
+  const resp = await apiLoginAdmin({ email, password });
+  return resp;
 };
 
 export const logout = (): void => {
-  localStorage.removeItem("token");
+  localStorage.setItem("login_user", "");
+  localStorage.removeItem("login_user");
 };
 
-export const getCurrentUser = (): { token: string } | null => {
-  const token = localStorage.getItem("token");
-  if (!token) return null;
-  // Optionally decode the JWT here if needed
-  return { token };
+export const getCurrentUser = () => {
+  try {
+    const duser = localStorage.getItem("login_user");
+    const user = JSON.stringify(duser);
+    return user;
+  } catch (error) {
+    console.log(error);
+    return null;
+  }
 };
 
 // ==== SOCIAL LOGIN ====

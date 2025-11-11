@@ -1,7 +1,13 @@
+
 import { Navigate } from "react-router-dom";
+import type { ReactNode } from "react";
 import { useAuth } from "../hooks/useAuth";
 
-export default function AuthGuard({ children }) {
+interface AuthGuardProps {
+  children: ReactNode;
+}
+
+export default function AuthGuard({ children }: AuthGuardProps) {
   const user = useAuth();
 
   if (user === undefined) {
@@ -12,5 +18,5 @@ export default function AuthGuard({ children }) {
     return <Navigate to="/account" replace />;
   }
 
-  return children;
+  return <>{children}</>;
 }

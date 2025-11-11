@@ -50,9 +50,12 @@ export interface ApiResponse<T = any> {
 // ==== GENERIC HELPER ====
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const errorText = await res.text();
+    const text = await res.text();
+    const result = JSON.parse(text);
+    const errorText = result?.message;
     throw new Error(errorText || `Request failed with status ${res.status}`);
   }
+
   return res.json() as Promise<T>;
 }
 
@@ -69,13 +72,12 @@ export async function registerAdmin(
 }
 
 export async function loginAdmin(data: LoginAdminParams): Promise<ApiResponse> {
-  alert(3);
   const res = await fetch(`${API_URL}/admin/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  alert(2);
+
   return handleResponse<ApiResponse>(res);
 }
 

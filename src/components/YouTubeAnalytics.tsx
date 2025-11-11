@@ -24,13 +24,13 @@ ChartJS.register(
   Legend
 );
 
-const CLIENT_ID =
+export const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 
 // API key for public stats
-const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
+export const API_KEY = "AIzaSyCKjx6yHE9L4RS-btVJsm2kxmuEtpciIbM";
 
-const SCOPES = [
+export const SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
   "https://www.googleapis.com/auth/youtube.readonly",
   "https://www.googleapis.com/auth/youtubepartner",
@@ -44,7 +44,7 @@ declare global {
   }
 }
 
-interface ChannelStats {
+ export interface ChannelStats {
   title: string;
   thumbnail: string;
   subscribers: string;
@@ -53,14 +53,14 @@ interface ChannelStats {
   description?: string;
 }
 
-interface Channel {
+export interface Channel {
   id: string;
   title: string;
   thumbnail: string;
 }
 
 // --- API response payload interfaces ---
-interface GapiChannelItem {
+export interface GapiChannelItem {
   id: string;
   snippet: {
     title: string;
@@ -82,13 +82,13 @@ interface GapiChannelItem {
   };
 }
 
-interface YouTubeChannelsListResponse {
+ export interface YouTubeChannelsListResponse {
   result: {
     items: GapiChannelItem[];
   };
 }
 
-interface PlaylistItem {
+export interface PlaylistItem {
   contentDetails: { videoId: string };
   snippet: {
     title: string;
@@ -96,23 +96,23 @@ interface PlaylistItem {
   };
 }
 
-interface PlaylistItemsListResponse {
+export interface PlaylistItemsListResponse {
   result: {
     items: PlaylistItem[];
     nextPageToken?: string;
   };
 }
 
-type AnalyticsRow = Array<string | number>;
+ export type AnalyticsRow = Array<string | number>;
 
-interface YouTubeAnalyticsReportResponse {
+export interface YouTubeAnalyticsReportResponse {
   result: {
     rows?: AnalyticsRow[];
     columnHeaders?: Array<{ name: string; columnType?: string; dataType?: string }>;
   };
 }
 
-interface PublicChannelApiResponse {
+export interface PublicChannelApiResponse {
   items?: Array<{
     snippet: {
       title: string;
@@ -127,16 +127,19 @@ interface PublicChannelApiResponse {
   }>;
 }
 
-type RevenueReportType = 'channel' | 'contentOwner';
+export type RevenueReportType = 'channel' | 'contentOwner';
 
-interface VideoRevenueItem {
+export interface VideoRevenueItem {
   id: string;
   title: string;
   thumbnail: string;
   revenue: number;
 }
 
-const YouTubeAnalytics: React.FC = () => {
+
+
+
+export const YouTubeAnalytics: React.FC = () => {
   const [gisLoaded, setGisLoaded] = useState(false);
   const [gapiLoaded, setGapiLoaded] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -203,6 +206,8 @@ const YouTubeAnalytics: React.FC = () => {
     setRevenueEndMonth(firstDayThisMonth.toISOString().slice(0, 7));
   }, [gapiLoaded]);
 
+
+  
   const fetchUserChannels = async () => {
     try {
       await window.gapi.client.load("youtube", "v3");
@@ -827,4 +832,4 @@ const fetchRevenue = async () => {
   );
 };
 
-export default YouTubeAnalytics;
+ 

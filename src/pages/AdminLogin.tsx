@@ -57,7 +57,10 @@ export default function AdminLogin() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    if (user) navigate("/admin");
+
+  if (user !== "null" && user !== null ) {
+     navigate("/account");
+    }
   }, [user, navigate]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -77,10 +80,11 @@ export default function AdminLogin() {
           : await loginAdmin(form.email, form.password);
 
         if (result.access_token) {
-          localStorage.setItem("token", result.access_token);
+          localStorage.setItem("login_user", JSON.stringify(result));
         }
 
-        navigate("/admin");
+     
+        navigate("/account");
       }
     } catch (err: any) {
       setMessage(err.message || "Something went wrong.");
