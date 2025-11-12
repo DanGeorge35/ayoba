@@ -50,13 +50,16 @@ const YouTubeConnect: React.FC = () => {
   }, []);
 
   // Connect new channel
+// Connect new channel
 const handleConnect = async () => {
   try {
     setLoadingModal(true);
-    const channel = await youtubeAuthService.authenticateChannel();
+    const channel = await youtubeAuthService.getAuthCodeAndExchangeToken(); // <-- use this
     if (channel) {
       setChannels((prev) => [...prev, channel]);
       if (!selectedChannel) setSelectedChannel(channel);
+    } else {
+      alert("Failed to authenticate channel. Please try again.");
     }
   } catch (err) {
     console.error(err);
@@ -65,6 +68,7 @@ const handleConnect = async () => {
     setLoadingModal(false);
   }
 };
+
   // Confirm remove channel
   const confirmRemove = (channelId: string, channelTitle: string) => {
     setConfirmModal({ show: true, channelId, channelTitle });
