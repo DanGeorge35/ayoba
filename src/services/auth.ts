@@ -66,8 +66,10 @@ export const logout = (): void => {
 export const getCurrentUser = () => {
   try {
     const duser = localStorage.getItem("login_user");
-    const user = JSON.stringify(duser);
-    return user;
+    if (duser) {
+      const user = JSON.parse(duser);
+      return user;
+    }
   } catch (error) {
     console.log(error);
     return null;

@@ -1,5 +1,3 @@
-// src/services/youtube.service.ts
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
@@ -28,12 +26,42 @@ export const formatDuration = (duration: string): string => {
 /**
  * Compute start and end dates for analytics range
  */
-export const getDateRange = (filter: "7d" | "30d" | "90d") => {
+export const getDateRange = (
+  filter: "7d" | "30d" | "90d" | "6m" | "1y" | "2y" | "5y"
+) => {
   const end = new Date();
   const start = new Date();
-  const days = filter === "90d" ? 90 : filter === "30d" ? 30 : 7;
-  start.setDate(end.getDate() - days);
-  return { start, end };
+
+  switch (filter) {
+    case "7d":
+      start.setDate(end.getDate() - 7);
+      break;
+    case "30d":
+      start.setDate(end.getDate() - 30);
+      break;
+    case "90d":
+      start.setDate(end.getDate() - 90);
+      break;
+    case "6m":
+      start.setMonth(end.getMonth() - 6);
+      break;
+    case "1y":
+      start.setFullYear(end.getFullYear() - 1);
+      break;
+    case "2y":
+      start.setFullYear(end.getFullYear() - 2);
+      break;
+    case "5y":
+      start.setFullYear(end.getFullYear() - 5);
+      break;
+    default:
+      start.setDate(end.getDate() - 30);
+  }
+
+  return {
+    start: start.toISOString().split("T")[0],
+    end: end.toISOString().split("T")[0],
+  };
 };
 
 /**
@@ -49,6 +77,80 @@ export const fetchYouTubeData = async <T>(
 
   if (!res.ok) throw new Error(`YouTube API Error: ${res.statusText}`);
   return res.json();
+};
+
+/**
+ * Fetch videos for a channel with views & revenue included
+ */
+export const fetchChannelVideos = async (
+  accessToken: string,
+  channelId: string,
+  maxResults = 20,
+  analyticsStartDate?: string,
+  analyticsEndDate?: string
+) => {
+  // Step 1: Get the upload playlist ID
+  const channelData = await fetchYouTubeData<any>(
+    `https://www.googleapis.com/youtube/v3/channels?part=contentDetails&id=${channelId}`,
+    accessToken
+  );
+
+  const uploadsPlaylistId =
+    channelData.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
+  if (!uploadsPlaylistId)
+    throw new Error("Uploads playlist not found for channel.");
+
+  // Step 2: Fetch videos from the upload playlist
+  const playlistData = await fetchYouTubeData<any>(
+    `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&playlistId=${uploadsPlaylistId}&maxResults=${maxResults}`,
+    accessToken
+  );
+
+  const videos = playlistData.items.map((item: any) => ({
+    id: item.contentDetails.videoId,
+    title: item.snippet.title,
+    thumbnail: item.snippet.thumbnails?.medium?.url,
+    publishedAt: item.snippet.publishedAt,
+    description: item.snippet.description,
+    revenue: 0, // default
+    views: 0, // default
+  }));
+
+  // Step 3: Fetch views for each video
+  if (videos.length > 0) {
+    const videoIds = videos.map((v) => v.id).join(",");
+    const statsData = await fetchYouTubeData<any>(
+      `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}`,
+      accessToken
+    );
+
+    statsData.items.forEach((item: any) => {
+      const video = videos.find((v) => v.id === item.id);
+      if (video) video.views = Number(item.statistics.viewCount || 0);
+    });
+  }
+
+  // Step 4: Fetch revenue for each video if analytics dates provided
+  if (analyticsStartDate && analyticsEndDate) {
+    for (const video of videos) {
+      try {
+        const response: any = await fetchYouTubeData<any>(
+          `https://youtubeanalytics.googleapis.com/v2/reports?ids=channel==MINE&startDate=${analyticsStartDate}&endDate=${analyticsEndDate}&metrics=estimatedRevenue&dimensions=video&filters=video==${video.id}`,
+          accessToken
+        );
+        const revenueValue = response.rows?.[0]?.[1] ?? 0;
+        const revenueNumber =
+          typeof revenueValue === "string"
+            ? Number(revenueValue)
+            : revenueValue;
+        video.revenue = Number.isFinite(revenueNumber) ? revenueNumber : 0;
+      } catch (err) {
+        console.warn(`Failed to fetch revenue for video ${video.id}`, err);
+      }
+    }
+  }
+
+  return videos;
 };
 
 /**
@@ -84,6 +186,9 @@ export const fetchTopVideos = async (accessToken: string, maxResults = 10) => {
   }));
 };
 
+/**
+ * Fetch channel-level analytics
+ */
 export const fetchChannelAnalytics = async (
   accessToken: string,
   startDate: string,

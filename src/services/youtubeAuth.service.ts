@@ -21,6 +21,7 @@ export interface ChannelToken {
   channelId: string;
   accessToken: string;
   channelTitle: string;
+  thumbnail: string;
 }
 
 const CHANNELS_KEY = "yt_channels_tokens";
@@ -86,6 +87,7 @@ export const youtubeAuthService = {
             channelId: channel.id,
             accessToken: tokenResponse.access_token,
             channelTitle: channel.snippet.title,
+            thumbnail: channel.snippet.thumbnails?.default?.url ?? "",
           };
 
           // Save in localStorage

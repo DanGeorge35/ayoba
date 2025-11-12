@@ -1,12 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from "react";
 import { youtubeAuthService, type ChannelToken } from "../services/youtubeAuth.service";
-import { fetchChannelAnalytics, formatNumber, getDateRange } from "../services/youtube.service";
+import { fetchChannelAnalytics, getDateRange } from "../services/youtube.service";
+import yticon from "../assets/yticon.png";
 
 const YouTubeConnect: React.FC = () => {
   const [channels, setChannels] = useState<ChannelToken[]>([]);
   const [selectedChannel, setSelectedChannel] = useState<ChannelToken | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
+
+  // Modal States
+  const [loadingModal, setLoadingModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    show: boolean;
+    channelId: string | null;
+    channelTitle: string | null;
+  }>({ show: false, channelId: null, channelTitle: null });
 
   // Load scripts and existing channels on mount
   useEffect(() => {
@@ -21,18 +30,35 @@ const YouTubeConnect: React.FC = () => {
 
   // Connect new channel
   const handleConnect = async () => {
-    const channel = await youtubeAuthService.authenticateChannel();
-    if (channel) {
-      setChannels((prev) => [...prev, channel]);
-      if (!selectedChannel) setSelectedChannel(channel);
+    try {
+      setLoadingModal(true);
+      const channel = await youtubeAuthService.authenticateChannel();
+      if (channel) {
+        setChannels((prev) => [...prev, channel]);
+        if (!selectedChannel) setSelectedChannel(channel);
+      }
+    } catch (err) {
+      setLoadingModal(false);
+      console.error(err);
+      alert("Authentication failed. Please try again.");
+   
+    } finally {
+      setLoadingModal(false);
     }
   };
 
-  // Remove channel
-  const handleRemove = (channelId: string) => {
-    youtubeAuthService.removeChannel(channelId);
-    setChannels((prev) => prev.filter((c) => c.channelId !== channelId));
-    if (selectedChannel?.channelId === channelId) setSelectedChannel(null);
+  // Confirm remove channel
+  const confirmRemove = (channelId: string, channelTitle: string) => {
+    setConfirmModal({ show: true, channelId, channelTitle });
+  };
+
+  // Remove channel (after confirmation)
+  const handleRemove = () => {
+    if (!confirmModal.channelId) return;
+    youtubeAuthService.removeChannel(confirmModal.channelId);
+    setChannels((prev) => prev.filter((c) => c.channelId !== confirmModal.channelId));
+    if (selectedChannel?.channelId === confirmModal.channelId) setSelectedChannel(null);
+    setConfirmModal({ show: false, channelId: null, channelTitle: null });
   };
 
   // Fetch analytics for selected channel
@@ -52,50 +78,92 @@ const YouTubeConnect: React.FC = () => {
   }, [selectedChannel]);
 
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-semibold mb-4">YouTube Analytics</h2>
+    <div className="p-4 sm:p-6 bg-gray-50 min-h-screen relative">
+      {/* Grid for Channel Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-8">
+        {/* Connect New Channel */}
+        <div className="rounded-2xl p-4 sm:p-6 bg-white flex flex-col items-center justify-center shadow-md h-72 sm:h-80 w-full max-w-xs sm:max-w-sm border border-red-500 hover:shadow-lg transition-shadow duration-200 mx-auto">
+          <img
+            src={yticon}
+            alt="YouTube"
+            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover bg-white mb-4 sm:mb-10 shadow-md"
+          />
+          <h2 className="text-sm sm:text-base text-gray-400 mb-4 sm:mb-10 text-center">
+            Connect Your YouTube Channel
+          </h2>
+          <button
+            onClick={handleConnect}
+            className="px-4 sm:px-5 py-1.5 sm:py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium text-xs sm:text-sm transition-colors duration-200"
+          >
+            + Connect Channel
+          </button>
+        </div>
 
-      {/* Channel List */}
-      <div className="flex flex-wrap gap-4 mb-4">
+        {/* Connected Channels */}
         {channels.map((c) => (
-          <div key={c.channelId} className="flex items-center gap-2">
-            <button
-              onClick={() => setSelectedChannel(c)}
-              className={`px-4 py-2 rounded-md border ${
-                selectedChannel?.channelId === c.channelId
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100"
-              }`}
-            >
+          <div
+            key={c.channelId}
+            className="rounded-2xl p-4 sm:p-6 bg-white flex flex-col items-center justify-center shadow-md h-72 sm:h-80 w-full max-w-xs sm:max-w-sm border border-gray-200 hover:shadow-lg transition-shadow duration-200 mx-auto"
+          >
+            <img
+              src={c.thumbnail || yticon}
+              alt={c.channelTitle}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-4 border-red-600 object-cover bg-white mb-4 sm:mb-10 shadow-md"
+            />
+            <h2 className="text-sm sm:text-base text-gray-700 font-medium mb-4 sm:mb-6 text-center">
               {c.channelTitle}
-            </button>
-            <button
-              onClick={() => handleRemove(c.channelId)}
-              className="text-red-500 text-sm"
-            >
-              ✕
-            </button>
+            </h2>
+            <div className="flex gap-2 sm:gap-4">
+             
+              <button
+                onClick={() => confirmRemove(c.channelId, c.channelTitle)}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm text-red-500 hover:text-red-700 font-semibold transition-colors duration-200"
+              >
+                ✕ Remove
+              </button>
+            </div>
           </div>
         ))}
-
-        <button
-          onClick={handleConnect}
-          className="px-4 py-2 bg-green-600 text-white rounded-md"
-        >
-          + Connect Channel
-        </button>
       </div>
 
-      {/* Selected Channel Analytics */}
-      {selectedChannel && analytics ? (
-        <div>
-          <h3 className="text-lg font-medium mb-2">{selectedChannel.channelTitle}</h3>
-          <p>Views: {formatNumber(analytics.rows?.[0]?.[1] || 0)}</p>
-          <p>Watch Time: {formatNumber(analytics.rows?.[0]?.[2] || 0)} mins</p>
-          <p>Subscribers: {formatNumber(analytics.rows?.[0]?.[3] || 0)}</p>
+      {/* --- Confirmation Modal --- */}
+      {confirmModal.show && (
+        <div className="fixed inset-0 bg-[#000000c8] bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-85 text-center shadow-lg">
+            <h2 className="text-lg font-semibold text-gray-800 mb-3">Remove Channel</h2>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to remove{" "}
+              <span className="font-medium text-red-600">{confirmModal.channelTitle}</span>?
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() =>
+                  setConfirmModal({ show: false, channelId: null, channelTitle: null })
+                }
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-md font-medium transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemove}
+                className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium transition"
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
         </div>
-      ) : (
-        <p>No channel selected.</p>
+      )}
+
+      {/* --- Loading Modal --- */}
+      {loadingModal && (
+        <div className="fixed inset-0 bg-[#140505da] bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-72 text-center shadow-lg">
+            <div className="animate-spin border-4 border-red-600 border-t-transparent rounded-full w-10 h-10 mx-auto mb-4"></div>
+            <h2 className="text-gray-700 font-medium">Adding Channel ...</h2>
+            <p className="text-sm text-gray-500 mt-1">Please wait a moment.</p>
+          </div>
+        </div>
       )}
     </div>
   );

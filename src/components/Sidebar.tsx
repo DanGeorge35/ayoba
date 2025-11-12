@@ -1,6 +1,8 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { logout } from "../services/auth";
-import logo from "../assets/logo.png";
+// import logo from "../assets/logo.png";
+import logol from "../assets/logo-l.png";
+
 import {
   PlusSquare,
   ClipboardList,
@@ -47,8 +49,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <button onClick={onClose} className="md:hidden p-4 " style={{position:"absolute", right:"30px",top:"10px"}}>
             <X size={22} />
           </button>
-        <div className="  p-5 bg-red-600">
-       <img src={logo} alt=" Logo" className="h-8  ml-4" />
+        <div className="  p-5 bg-white">
+       <img src={logol} alt=" Logo" className="h-8  ml-4" />
           {/* <div className="text-[#bb0101] text-[16px]   font-bold">Ayouba App</div> */}
 
     
@@ -68,21 +70,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <LayoutDashboard size={18} />
             Dashboard
           </NavLink>
+          
 
-          <NavLink
-              to="/account/create-project"
-              className={({ isActive }) =>
-                `${linkClass} ${isActive ? activeClass : ""} mb-3`
-              }
-              onClick={onClose}
-            >
-              <PlusSquare size={18} />
-              Add New Video
-            </NavLink>
-
+       
 
             <NavLink
-              to="/account/create-project"
+              to="/account/videos"
               className={({ isActive }) =>
                 `${linkClass} ${isActive ? activeClass : ""} mb-3`
               }
@@ -106,7 +99,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           
 
             <NavLink
-              to="/account/create-project"
+              to="/account/videos-analytics"
               className={({ isActive }) =>
                 `${linkClass} ${isActive ? activeClass : ""} mb-3`
               }
@@ -187,6 +180,19 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               <PlusSquare size={18} />
               New User Account
             </NavLink>
+
+
+             <NavLink
+              to="/account/projects"
+              className={({ isActive }) =>
+                `${linkClass} ${isActive ? activeClass : ""} mb-3`
+              }
+              onClick={onClose}
+            >
+              <ClipboardList size={18} />
+            All Users Accounts
+            </NavLink>
+
           </div>
 
 
