@@ -24,35 +24,53 @@ const YouTubeConnect: React.FC = () => {
       const saved = youtubeAuthService.getStoredChannels();
       setChannels(saved);
       if (saved.length > 0) setSelectedChannel(saved[0]);
+
+      // Check if redirected from Google with code
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get("code");
+      if (code) {
+        setLoadingModal(true);
+        try {
+          const channel = await youtubeAuthService.exchangeCodeForTokens(code);
+          if (channel) {
+            setChannels((prev) => [...prev, channel]);
+            setSelectedChannel(channel);
+          }
+          // Remove code from URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (err) {
+          console.error("Failed to authenticate channel:", err);
+          alert("Failed to connect channel. Please try again.");
+        } finally {
+          setLoadingModal(false);
+        }
+      }
     };
     init();
   }, []);
 
   // Connect new channel
-  const handleConnect = async () => {
-    try {
-      setLoadingModal(true);
-      const channel = await youtubeAuthService.authenticateChannel();
-      if (channel) {
-        setChannels((prev) => [...prev, channel]);
-        if (!selectedChannel) setSelectedChannel(channel);
-      }
-    } catch (err) {
-      setLoadingModal(false);
-      console.error(err);
-      alert("Authentication failed. Please try again.");
-   
-    } finally {
-      setLoadingModal(false);
+const handleConnect = async () => {
+  try {
+    setLoadingModal(true);
+    const channel = await youtubeAuthService.authenticateChannel();
+    if (channel) {
+      setChannels((prev) => [...prev, channel]);
+      if (!selectedChannel) setSelectedChannel(channel);
     }
-  };
-
+  } catch (err) {
+    console.error(err);
+    alert("Authentication failed. Please try again.");
+  } finally {
+    setLoadingModal(false);
+  }
+};
   // Confirm remove channel
   const confirmRemove = (channelId: string, channelTitle: string) => {
     setConfirmModal({ show: true, channelId, channelTitle });
   };
 
-  // Remove channel (after confirmation)
+  // Remove channel
   const handleRemove = () => {
     if (!confirmModal.channelId) return;
     youtubeAuthService.removeChannel(confirmModal.channelId);
@@ -114,7 +132,6 @@ const YouTubeConnect: React.FC = () => {
               {c.channelTitle}
             </h2>
             <div className="flex gap-2 sm:gap-4">
-             
               <button
                 onClick={() => confirmRemove(c.channelId, c.channelTitle)}
                 className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm text-red-500 hover:text-red-700 font-semibold transition-colors duration-200"

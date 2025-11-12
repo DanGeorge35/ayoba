@@ -58,7 +58,7 @@ export default function AdminLogin() {
 
   useEffect(() => {
 
-  if (user !== "null" && user !== null ) {
+  if (user !== "null" && user !== null  && user !== undefined ) {
      navigate("/account");
     }
   }, [user, navigate]);
@@ -97,7 +97,7 @@ export default function AdminLogin() {
     setForm({ ...form, [field]: e.target.value });
   };
 
-  if (user === undefined) return <p className="p-8">Checking login...</p>;
+  // if (user === undefined) return <p className="p-8">Checking login...</p>;
 
   return (
     <div className="w-full min-h-screen grid grid-cols-1 lg:grid-cols-2">

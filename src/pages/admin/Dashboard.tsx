@@ -47,7 +47,7 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     console.log("user", user);
-    if (user === "null" || user === null) {
+    if (user === "null" || user === null || user === undefined) {
       navigate("/");
     }
   }, [user, navigate]);

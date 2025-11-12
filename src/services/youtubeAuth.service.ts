@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import axios from "axios";
+
 export const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
+
+export const REDIRECT_URI = "http://localhost:3000/admin/google/callback"; // Must match OAuth credentials
+export const BACKEND_URL = "http://localhost:3000/admin"; // Your backend endpoint
 
 export const SCOPES = [
   "https://www.googleapis.com/auth/yt-analytics.readonly",
@@ -16,10 +21,11 @@ declare global {
   }
 }
 
-// Type for storing multiple channel tokens
 export interface ChannelToken {
   channelId: string;
   accessToken: string;
+  refreshToken: string;
+  expiresAt: number; // timestamp when token expires
   channelTitle: string;
   thumbnail: string;
 }
@@ -32,6 +38,8 @@ export const youtubeAuthService = {
    */
   loadScripts: (): Promise<void> => {
     return new Promise((resolve) => {
+      if (window.gapi) return resolve(); // Already loaded
+
       const gapiScript = document.createElement("script");
       gapiScript.src = "https://apis.google.com/js/api.js";
       gapiScript.async = true;
@@ -48,92 +56,128 @@ export const youtubeAuthService = {
   },
 
   /**
-   * Authenticate user and add channel to stored tokens
+   * Open OAuth popup and return authorization code
    */
-  authenticateChannel: async (): Promise<ChannelToken | null> => {
+  getAuthCode: (): Promise<string> => {
     return new Promise((resolve, reject) => {
-      if (!window.google || !window.gapi) {
-        return reject("Google scripts not loaded yet");
-      }
-
-      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+      const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+      authUrl.search = new URLSearchParams({
         client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URI,
+        response_type: "code",
         scope: SCOPES,
-        callback: async (tokenResponse: any) => {
-          if (!tokenResponse.access_token) return reject("No access token");
+        access_type: "offline",
+        prompt: "consent",
+      }).toString();
 
-          // Set token for gapi
-          window.gapi.client.setToken({
-            access_token: tokenResponse.access_token,
-          });
+      const width = 500;
+      const height = 600;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
 
-          // Load YouTube APIs
-          await window.gapi.client.load("youtubeAnalytics", "v2");
-          await window.gapi.client.load("youtube", "v3");
+      const popup = window.open(
+        authUrl.toString(),
+        "google_oauth",
+        `width=${width},height=${height},top=${top},left=${left}`
+      );
 
-          // Fetch user channels
-          const res = await window.gapi.client.youtube.channels.list({
-            part: "snippet,contentDetails",
-            mine: true,
-            maxResults: 50,
-          });
+      if (!popup) return reject("Popup blocked");
 
-          if (!res.result.items || res.result.items.length === 0)
-            return reject("No channels found");
+      const listener = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        if (event.data.type === "google_oauth_code") {
+          window.removeEventListener("message", listener);
+          popup.close();
+          resolve(event.data.code);
+        }
+      };
 
-          // Pick first channel for simplicity (user can select later)
-          const channel = res.result.items[0];
-          const channelToken: ChannelToken = {
-            channelId: channel.id,
-            accessToken: tokenResponse.access_token,
-            channelTitle: channel.snippet.title,
-            thumbnail: channel.snippet.thumbnails?.default?.url ?? "",
-          };
-
-          // Save in localStorage
-          const stored = youtubeAuthService.getStoredChannels();
-          const updated = [
-            ...stored.filter((c) => c.channelId !== channelToken.channelId),
-            channelToken,
-          ];
-          localStorage.setItem(CHANNELS_KEY, JSON.stringify(updated));
-
-          resolve(channelToken);
-        },
-      });
-
-      tokenClient.requestAccessToken();
+      window.addEventListener("message", listener);
     });
   },
 
   /**
-   * Get all stored channel tokens
+   * Exchange authorization code for tokens via backend
    */
-  getStoredChannels: (): ChannelToken[] => {
-    const data = localStorage.getItem(CHANNELS_KEY);
-    if (!data) return [];
+  exchangeCodeForTokens: async (code: string): Promise<ChannelToken | null> => {
     try {
-      return JSON.parse(data) as ChannelToken[];
+      const { data } = await axios.post(`${BACKEND_URL}/exchange-code`, {
+        code,
+      });
+      const { access_token, refresh_token, expires_in } = data;
+
+      await youtubeAuthService.loadScripts();
+      await window.gapi.client.load("youtube", "v3");
+      window.gapi.client.setToken({ access_token });
+
+      const res = await window.gapi.client.youtube.channels.list({
+        part: "snippet,contentDetails",
+        mine: true,
+        maxResults: 1,
+      });
+
+      if (!res.result.items || res.result.items.length === 0) return null;
+
+      const channel = res.result.items[0];
+      const expiresAt = Date.now() + expires_in * 1000;
+
+      const tokenData: ChannelToken = {
+        channelId: channel.id,
+        accessToken: access_token,
+        refreshToken: refresh_token,
+        expiresAt,
+        channelTitle: channel.snippet.title,
+        thumbnail: channel.snippet.thumbnails?.default?.url ?? "",
+      };
+
+      youtubeAuthService.saveChannel(tokenData);
+      return tokenData;
+    } catch (err) {
+      console.error("Token exchange failed:", err);
+      return null;
+    }
+  },
+
+  /**
+   * Authenticate channel (popup + exchange tokens)
+   */
+  authenticateChannel: async (): Promise<ChannelToken | null> => {
+    const code = await youtubeAuthService.getAuthCode();
+    return youtubeAuthService.exchangeCodeForTokens(code);
+  },
+
+  /**
+   * Local storage helpers
+   */
+  saveChannel: (channel: ChannelToken) => {
+    const all = youtubeAuthService.getStoredChannels();
+    const updated = [
+      ...all.filter((c) => c.channelId !== channel.channelId),
+      channel,
+    ];
+    localStorage.setItem(CHANNELS_KEY, JSON.stringify(updated));
+  },
+
+  getStoredChannels: (): ChannelToken[] => {
+    try {
+      return JSON.parse(localStorage.getItem(CHANNELS_KEY) || "[]");
     } catch {
       return [];
     }
   },
 
-  /**
-   * Remove a channel from stored tokens
-   */
-  removeChannel: (channelId: string) => {
-    const stored = youtubeAuthService.getStoredChannels();
-    const updated = stored.filter((c) => c.channelId !== channelId);
-    localStorage.setItem(CHANNELS_KEY, JSON.stringify(updated));
+  getChannel: (channelId: string): ChannelToken | null => {
+    return (
+      youtubeAuthService
+        .getStoredChannels()
+        .find((c) => c.channelId === channelId) || null
+    );
   },
 
-  /**
-   * Get a channel token by channelId
-   */
-  getTokenByChannelId: (channelId: string): string | null => {
-    const stored = youtubeAuthService.getStoredChannels();
-    const channel = stored.find((c) => c.channelId === channelId);
-    return channel ? channel.accessToken : null;
+  removeChannel: (channelId: string) => {
+    const updated = youtubeAuthService
+      .getStoredChannels()
+      .filter((c) => c.channelId !== channelId);
+    localStorage.setItem(CHANNELS_KEY, JSON.stringify(updated));
   },
 };
