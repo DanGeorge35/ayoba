@@ -4,7 +4,7 @@ import axios from "axios";
 export const CLIENT_ID =
   "943556130775-fbsgln3igbohm502mhhomn0e8q2895gj.apps.googleusercontent.com";
 
-export const REDIRECT_URI = "http://localhost:3000/admin/google/callback"; // Must match OAuth credentials
+export const REDIRECT_URI = "http://localhost:3000/admin/google/callback.html"; // Must match OAuth credentials
 export const BACKEND_URL = "http://localhost:3000/admin"; // Your backend endpoint
 
 export const SCOPES = [
@@ -24,8 +24,8 @@ declare global {
 export interface ChannelToken {
   channelId: string;
   accessToken: string;
-  refreshToken: string;
-  expiresAt: number; // timestamp when token expires
+  refreshToken?: string;
+  expiresAt?: number; // timestamp when token expires
   channelTitle: string;
   thumbnail: string;
 }
@@ -96,7 +96,7 @@ export const youtubeAuthService = {
     });
   },
 
-  getAuthCodeAndExchangeToken: (): Promise<ChannelToken | null> => {
+  getAuthCodeAndExchangeToken: async (): Promise<ChannelToken | null> => {
     return new Promise((resolve, reject) => {
       const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
       authUrl.search = new URLSearchParams({
@@ -121,61 +121,67 @@ export const youtubeAuthService = {
 
       if (!popup) return reject("Popup blocked");
 
-      const listener = (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
+      // Listen for messages from the popup
+      const listener = async (event: MessageEvent) => {
+        if (event.origin !== "http://localhost:3000") return; // frontend origin
         if (event.data.type === "google_oauth_code") {
           window.removeEventListener("message", listener);
-
           const code = event.data.code;
 
-          // Close popup immediately
-          if (popup && !popup.closed) popup.close();
+          try {
+            // Exchange code via backend
+            const { data } = await axios.post(`${BACKEND_URL}/exchange-code`, {
+              code,
+            });
+            const { access_token, refresh_token, expires_in } = data;
 
-          // Now continue async work
-          (async () => {
-            try {
-              const { data } = await axios.post(
-                `${BACKEND_URL}/exchange-code`,
-                { code }
-              );
-              const { access_token, refresh_token, expires_in } = data;
+            await youtubeAuthService.loadScripts();
+            await window.gapi.client.load("youtube", "v3");
+            window.gapi.client.setToken({ access_token });
 
-              await youtubeAuthService.loadScripts();
-              await window.gapi.client.load("youtube", "v3");
-              window.gapi.client.setToken({ access_token });
+            const res = await window.gapi.client.youtube.channels.list({
+              part: "snippet,contentDetails",
+              mine: true,
+              maxResults: 1,
+            });
 
-              const res = await window.gapi.client.youtube.channels.list({
-                part: "snippet,contentDetails",
-                mine: true,
-                maxResults: 1,
-              });
+            if (!res.result.items || res.result.items.length === 0)
+              return resolve(null);
 
-              if (!res.result.items || res.result.items.length === 0)
-                return resolve(null);
+            const channel = res.result.items[0];
+            const expiresAt = Date.now() + expires_in * 1000;
 
-              const channel = res.result.items[0];
-              const expiresAt = Date.now() + expires_in * 1000;
+            const tokenData: ChannelToken = {
+              channelId: channel.id,
+              accessToken: access_token,
+              refreshToken: refresh_token,
+              expiresAt,
+              channelTitle: channel.snippet.title,
+              thumbnail: channel.snippet.thumbnails?.default?.url ?? "",
+            };
 
-              const tokenData: ChannelToken = {
-                channelId: channel.id,
-                accessToken: access_token,
-                refreshToken: refresh_token,
-                expiresAt,
-                channelTitle: channel.snippet.title,
-                thumbnail: channel.snippet.thumbnails?.default?.url ?? "",
-              };
+            youtubeAuthService.saveChannel(tokenData);
+            resolve(tokenData);
+          } catch (err) {
+            console.error("Token exchange failed:", err);
+            resolve(null);
+          }
 
-              youtubeAuthService.saveChannel(tokenData);
-              resolve(tokenData);
-            } catch (err) {
-              console.error("Token exchange failed:", err);
-              resolve(null);
-            }
-          })();
+          // Close the popup safely (COOP-safe)
+          if (!popup.closed) popup.close();
         }
       };
 
       window.addEventListener("message", listener);
+
+      // Fallback: detect if popup closed without completing OAuth
+      const checkPopupClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopupClosed);
+          window.removeEventListener("message", listener);
+          resolve(null); // user closed popup
+        }
+      }, 500);
     });
   },
 
